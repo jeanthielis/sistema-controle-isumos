@@ -26,7 +26,9 @@
                             blue: '#0EA5E9',
                             dark: '#1E293B'
                         },
-                        fundo: '#F8FAFC'
+                        fundo: '#F8FAFC',
+                        prata: '#94A3B8',
+                        verdeclaro: '#34D399'
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -475,15 +477,992 @@
                 <span class="text-[10px] font-bold">Auditoria</span>
             </button>
         </nav>
-        
+
+        </div>
     </template>
 </div>
 
 <script>
     const { createApp, ref, computed, watch, onMounted, onUnmounted, nextTick } = Vue;
-    // ===== TODO O SEU CÓDIGO JAVASCRIPT DO VUE CONTINUA EXATAMENTE AQUI =====
-    // Copie tudo o que estava dentro da tag <script> no ficheiro original a partir desta linha
-    // (A configuração do Chart.js, firebaseConfig, app = createApp({ ... }), etc).
+
+    // Componente Vue para o Gráfico Chart.js (com seletor de ano)
+    const ChartConsumo = {
+        props: ['historico', 'unidade'],
+        template: `
+            <div>
+                <div class="flex justify-between items-center mb-2 gap-2">
+                    <select v-model="anoSelecionado" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white">
+                        <option v-for="ano in anosDisponiveis" :key="ano" :value="ano">{{ ano }}</option>
+                    </select>
+                    <span class="text-sm font-bold text-egipcio bg-blue-100 px-2 py-1 rounded">{{ totalAnual }} {{ unidade }}</span>
+                </div>
+                <div class="relative h-40 w-full">
+                    <canvas ref="canvasEl"></canvas>
+                </div>
+            </div>
+        `,
+        setup(props) {
+            const canvasEl = ref(null);
+            let chartInstance = null;
+
+            const anosDisponiveis = computed(() => {
+                const anos = Object.keys(props.historico || {}).sort().reverse();
+                return anos.length > 0 ? anos : [String(new Date().getFullYear())];
+            });
+            const anoSelecionado = ref(anosDisponiveis.value[0]);
+
+            const dadosAno = computed(() => (props.historico && props.historico[anoSelecionado.value]) || Array(12).fill(0));
+            const totalAnual = computed(() => dadosAno.value.reduce((acc, val) => acc + val, 0));
+
+            const renderizar = () => {
+                if (!canvasEl.value) return;
+                if (chartInstance) chartInstance.destroy();
+                const ctx = canvasEl.value.getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                        datasets: [{
+                            label: 'Consumo Mensal',
+                            data: dadosAno.value,
+                            backgroundColor: '#4F46E5',
+                            borderRadius: 4,
+                            hoverBackgroundColor: '#7C3AED'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                            x: { ticks: { font: { size: 10 } } }
+                        }
+                    }
+                });
+            };
+
+            onMounted(renderizar);
+            watch(anoSelecionado, renderizar);
+            onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
+
+            return { canvasEl, totalAnual, anosDisponiveis, anoSelecionado };
+        }
+    };
+
+    // Componente Vue para o gráfico comparativo de custo por categoria
+    const GraficoCategorias = {
+        props: ['dados'], // { categoria: custoTotal }
+        template: `<div class="relative h-48 w-full"><canvas ref="canvasEl"></canvas></div>`,
+        setup(props) {
+            const canvasEl = ref(null);
+            let chartInstance = null;
+
+            const renderizar = () => {
+                if (!canvasEl.value) return;
+                if (chartInstance) chartInstance.destroy();
+                const labels = Object.keys(props.dados || {});
+                const valores = Object.values(props.dados || {});
+                const ctx = canvasEl.value.getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Custo Acumulado (R$)',
+                            data: valores,
+                            backgroundColor: '#4F46E5',
+                            borderRadius: 4,
+                            hoverBackgroundColor: '#7C3AED'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                            y: { ticks: { font: { size: 10 } } }
+                        }
+                    }
+                });
+            };
+
+            onMounted(renderizar);
+            watch(() => props.dados, renderizar, { deep: true });
+            onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
+
+            return { canvasEl };
+        }
+    };
+
+    // ============================================================
+    // CONFIGURAÇÃO DO FIREBASE
+    // ============================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyAtoVPTGvwmQ-wOnKuKVFFKHkTwV43tGZI",
+        authDomain: "insumo-pro.firebaseapp.com",
+        projectId: "insumo-pro",
+        storageBucket: "insumo-pro.firebasestorage.app",
+        messagingSenderId: "334371369968",
+        appId: "1:334371369968:web:a4215ae8b6f17eb61c6335",
+        measurementId: "G-QMD87RLG13"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const COL_INSUMOS = 'insumos';
+    const COL_USUARIOS = 'usuarios';
+    const COL_LOGS = 'logs';
+    const COL_CONVITES = 'convites';
+    const COL_ALERTAS = 'alertas';
+    const DOMINIO_EMAIL = 'insumo.com.br'; // domínio usado para gerar o e-mail de acesso automaticamente
+    const DIAS_SEM_AUDITORIA_ALERTA = 30; // dias sem contagem física para disparar alerta
+
+    const TIPOS_ALERTA = {
+        estoque_zerado: { label: 'Estoque zerado', icone: 'fa-ban' },
+        estoque_critico: { label: 'Estoque crítico', icone: 'fa-triangle-exclamation' },
+        sem_auditoria: { label: 'Sem auditoria recente', icone: 'fa-clock' }
+    };
+
+    const app = createApp({
+        setup() {
+            // ---------- Toasts (substituem os alert() nativos do navegador) ----------
+            const toasts = ref([]);
+            const mostrarToast = (mensagem, tipo = 'sucesso', duracao = 3500) => {
+                const id = Date.now() + Math.random();
+                toasts.value.push({ id, tipo, mensagem });
+                setTimeout(() => removerToast(id), duracao);
+            };
+            const removerToast = (id) => {
+                toasts.value = toasts.value.filter(t => t.id !== id);
+            };
+
+            // ---------- Autenticação e níveis de acesso ----------
+            // Três níveis: 'administrador' (tudo), 'supervisor' (operação + cadastro),
+            // 'inspetor' (apenas dashboard e auditoria).
+            const usuarioAtual = ref(null);
+            const perfil = ref(null);
+            const modoRegistro = ref(false);
+            const authForm = ref({ nome: '', email: '', senha: '' });
+            const authErro = ref(null);
+
+            const souAdmin = computed(() => perfil.value === 'administrador');
+            const souSupervisor = computed(() => perfil.value === 'supervisor');
+            const souInspetor = computed(() => perfil.value === 'inspetor');
+
+            // Regras de permissão derivadas do nível de acesso
+            const podeCadastrarProduto = computed(() => souAdmin.value || souSupervisor.value);
+            const podeEditarExcluir = computed(() => souAdmin.value || souSupervisor.value);
+            const podeVerLogs = computed(() => souAdmin.value || souSupervisor.value);
+            const podeCadastrarPessoa = computed(() => souAdmin.value || souSupervisor.value);
+
+            const entrar = async () => {
+                authErro.value = null;
+                try {
+                    await auth.signInWithEmailAndPassword(authForm.value.email, authForm.value.senha);
+                    mostrarToast('Acesso liberado!', 'sucesso');
+                } catch (e) {
+                    authErro.value = 'Não foi possível entrar. Verifique e-mail e senha.';
+                }
+            };
+
+            const registrar = async () => {
+                authErro.value = null;
+                try {
+                    const cred = await auth.createUserWithEmailAndPassword(authForm.value.email, authForm.value.senha);
+                    const emailLower = cred.user.email.toLowerCase();
+                    let nivelAcesso = 'inspetor'; // nível padrão para quem se cadastra sem convite
+                    let nome = authForm.value.nome || '';
+
+                    // Se essa pessoa foi previamente cadastrada por um admin/supervisor,
+                    // herda automaticamente o nível de acesso definido no convite.
+                    try {
+                        const convite = await db.collection(COL_CONVITES).doc(emailLower).get();
+                        if (convite.exists && convite.data().usado === false) {
+                            nivelAcesso = convite.data().nivelAcesso || 'inspetor';
+                            nome = convite.data().nome || nome;
+                            await db.collection(COL_CONVITES).doc(emailLower).update({ usado: true });
+                        }
+                    } catch (e) {
+                        console.error('Erro ao verificar convite:', e);
+                    }
+
+                    await db.collection(COL_USUARIOS).doc(cred.user.uid).set({
+                        email: cred.user.email,
+                        nome,
+                        role: nivelAcesso,
+                        criadoEm: Date.now()
+                    });
+                    mostrarToast('Login cadastrado com sucesso!', 'sucesso');
+                    mostrarToast('Acesso liberado!', 'sucesso');
+                } catch (e) {
+                    authErro.value = 'Não foi possível cadastrar. O e-mail já pode estar em uso ou a senha é muito curta.';
+                }
+            };
+
+            const sair = () => {
+                menuAberto.value = false;
+                auth.signOut();
+            };
+
+            auth.onAuthStateChanged(async (user) => {
+                usuarioAtual.value = user;
+                perfil.value = null;
+                if (user) {
+                    try {
+                        const doc = await db.collection(COL_USUARIOS).doc(user.uid).get();
+                        perfil.value = doc.exists ? (doc.data().role || 'inspetor') : 'inspetor';
+                    } catch (e) {
+                        perfil.value = 'inspetor';
+                    }
+                }
+            });
+
+            // ---------- Estado geral ----------
+            const abaAtiva = ref('dashboard');
+            const menuAberto = ref(false);
+            const mostrarModalCadastro = ref(false);
+            const mostrarModalPessoa = ref(false);
+            const insumos = ref([]);
+            const carregando = ref(true);
+            const erroConexao = ref(null);
+            const filtroCategoria = ref(null);
+            const logs = ref([]);
+            const usuarios = ref([]);
+            const convites = ref([]);
+            const alertas = ref([]);
+            const dominioEmail = DOMINIO_EMAIL;
+            const formConvite = ref({ nome: '', email: '', nivelAcesso: 'inspetor', emailEditadoManualmente: false });
+
+            const formDefault = () => ({
+                nome: '', categoria: '', unidade: 'kg', estoqueAtual: 0,
+                estoqueMinimoDias: 5, custoUnitario: 0, codigoBarra: '',
+                fornecedorNome: '', fornecedorContato: '', unidadeFabril: 'Fábrica 1'
+            });
+            const form = ref(formDefault());
+
+            const irPara = (aba) => {
+                menuAberto.value = false;
+                if (aba === 'cadastro') {
+                    form.value.unidadeFabril = unidadeFabrilSelecionada.value || 'Fábrica 1';
+                    mostrarModalCadastro.value = true;
+                    return;
+                }
+                abaAtiva.value = aba;
+            };
+
+            let unsubscribeInsumos = null;
+            let unsubscribeLogs = null;
+            let unsubscribeUsuarios = null;
+            let unsubscribeConvites = null;
+            let unsubscribeAlertas = null;
+
+            onMounted(() => {
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+
+                unsubscribeInsumos = db.collection(COL_INSUMOS).onSnapshot(
+                    (snapshot) => {
+                        insumos.value = snapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return { id: doc.id, ...data, novoEstoque: data.estoqueAtual, mostrarGrafico: false };
+                        });
+                        carregando.value = false;
+                        erroConexao.value = null;
+                        sincronizarAlertas();
+                    },
+                    (erro) => {
+                        console.error('Erro ao conectar ao Firestore:', erro);
+                        carregando.value = false;
+                        erroConexao.value = 'Não foi possível conectar ao Firebase. Verifique firebaseConfig e as regras de segurança do Firestore.';
+                    }
+                );
+
+                unsubscribeLogs = db.collection(COL_LOGS).orderBy('timestamp', 'desc').limit(50).onSnapshot(
+                    (snapshot) => { logs.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); },
+                    (erro) => console.error('Erro ao ler logs:', erro)
+                );
+
+                unsubscribeUsuarios = db.collection(COL_USUARIOS).onSnapshot(
+                    (snapshot) => { usuarios.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); },
+                    (erro) => console.error('Erro ao ler usuários:', erro)
+                );
+
+                unsubscribeConvites = db.collection(COL_CONVITES).onSnapshot(
+                    (snapshot) => { convites.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); },
+                    (erro) => console.error('Erro ao ler convites:', erro)
+                );
+
+                unsubscribeAlertas = db.collection(COL_ALERTAS).orderBy('criadoEm', 'desc').onSnapshot(
+                    (snapshot) => { alertas.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); },
+                    (erro) => console.error('Erro ao ler alertas:', erro)
+                );
+            });
+
+            onUnmounted(() => {
+                if (unsubscribeInsumos) unsubscribeInsumos();
+                if (unsubscribeLogs) unsubscribeLogs();
+                if (unsubscribeUsuarios) unsubscribeUsuarios();
+                if (unsubscribeConvites) unsubscribeConvites();
+                if (unsubscribeAlertas) unsubscribeAlertas();
+            });
+
+            // ---------- Derivados ----------
+            // Normaliza categoria para agrupar variações como "LIMPEZA", "limpeza", "  Limpeza  "
+            // todas sob um único rótulo padronizado ("Limpeza").
+            const normalizarCategoria = (texto) => {
+                return (texto || '')
+                    .trim()
+                    .replace(/\s+/g, ' ')
+                    .toLowerCase()
+                    .split(' ')
+                    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+                    .join(' ');
+            };
+
+            // Multi-unidade: cada insumo pertence a uma "unidade fabril" (Fábrica 1, 2, 3...).
+            // Um seletor global filtra tudo (dashboard, auditoria, KPIs, relatórios) por unidade.
+            const unidadeFabrilSelecionada = ref(null); // null = todas as unidades
+
+            const unidadesFabris = computed(() => {
+                const set = new Set(insumos.value.map(i => i.unidadeFabril || 'Fábrica 1'));
+                return Array.from(set).sort();
+            });
+
+            const insumosDaUnidade = computed(() => {
+                if (!unidadeFabrilSelecionada.value) return insumos.value;
+                return insumos.value.filter(i => (i.unidadeFabril || 'Fábrica 1') === unidadeFabrilSelecionada.value);
+            });
+
+            const categorias = computed(() => {
+                const mapa = new Map(); // chave normalizada (lowercase) -> rótulo padronizado para exibir
+                insumosDaUnidade.value.forEach(i => {
+                    if (!i.categoria) return;
+                    const chave = i.categoria.trim().toLowerCase();
+                    if (chave && !mapa.has(chave)) mapa.set(chave, normalizarCategoria(i.categoria));
+                });
+                return Array.from(mapa.values()).sort();
+            });
+
+            // Busca por nome + ordenação (dashboard)
+            const buscaTexto = ref('');
+            const ordenacao = ref('nome-asc');
+
+            const insumosFiltrados = computed(() => {
+                let lista = insumosDaUnidade.value;
+
+                if (filtroCategoria.value) {
+                    const alvo = filtroCategoria.value.trim().toLowerCase();
+                    lista = lista.filter(i => (i.categoria || '').trim().toLowerCase() === alvo);
+                }
+
+                if (buscaTexto.value.trim()) {
+                    const termo = buscaTexto.value.trim().toLowerCase();
+                    lista = lista.filter(i => i.nome.toLowerCase().includes(termo));
+                }
+
+                const ordenada = [...lista];
+                ordenada.sort((a, b) => {
+                    switch (ordenacao.value) {
+                        case 'nome-desc': return b.nome.localeCompare(a.nome);
+                        case 'estoque-asc': return a.estoqueAtual - b.estoqueAtual;
+                        case 'estoque-desc': return b.estoqueAtual - a.estoqueAtual;
+                        case 'dias-asc': return (a.diasRestantes ?? Infinity) - (b.diasRestantes ?? Infinity);
+                        case 'dias-desc': return (b.diasRestantes ?? -Infinity) - (a.diasRestantes ?? -Infinity);
+                        default: return a.nome.localeCompare(b.nome);
+                    }
+                });
+                return ordenada;
+            });
+
+            const alertasCriticos = computed(() =>
+                insumosDaUnidade.value.filter(i => i.diasRestantes !== null && i.diasRestantes !== undefined && i.diasRestantes <= (i.estoqueMinimoDias || 5))
+            );
+
+            // ---------- KPIs e gráfico comparativo por categoria ----------
+            const kpis = computed(() => {
+                const lista = insumosDaUnidade.value;
+                const anoAtual = String(new Date().getFullYear());
+                const totalInsumos = lista.length;
+                const custoTotalAcumulado = lista.reduce((acc, i) => acc + (i.custoAcumulado || 0), 0);
+
+                let maisConsumido = null;
+                let maiorConsumo = -1;
+                lista.forEach(i => {
+                    const arr = (i.historico && i.historico[anoAtual]) || [];
+                    const total = arr.reduce((a, b) => a + b, 0);
+                    if (total > maiorConsumo) { maiorConsumo = total; maisConsumido = i; }
+                });
+
+                return { totalInsumos, custoTotalAcumulado, maisConsumido: maiorConsumo > 0 ? maisConsumido : null };
+            });
+
+            const custoPorCategoria = computed(() => {
+                const mapa = {};
+                insumosDaUnidade.value.forEach(i => {
+                    const cat = i.categoria || 'Sem categoria';
+                    mapa[cat] = (mapa[cat] || 0) + (i.custoAcumulado || 0);
+                });
+                return mapa;
+            });
+
+            // ---------- Sistema de Alertas (persistido no Firestore) ----------
+            // Gera automaticamente alertas de: estoque zerado, estoque crítico e
+            // insumo sem auditoria recente. Cada alerta tem um ID determinístico
+            // (insumoId + tipo), então nunca duplica mesmo com vários usuários
+            // conectados ao mesmo tempo.
+            const gerarMensagemAlerta = (tipo, insumo) => {
+                if (tipo === 'estoque_zerado') return `${insumo.nome} está com estoque zerado (0 ${insumo.unidade}).`;
+                if (tipo === 'estoque_critico') return `Previsão de acabar em ${insumo.diasRestantes.toFixed(1)} dias (limite: ${insumo.estoqueMinimoDias || 5} dias).`;
+                if (tipo === 'sem_auditoria') return `Sem contagem física há mais de ${DIAS_SEM_AUDITORIA_ALERTA} dias.`;
+                return `${insumo.nome}: alerta.`;
+            };
+
+            const dispararNotificacaoNavegador = (tipo, insumo) => {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(TIPOS_ALERTA[tipo].label + ': ' + insumo.nome, { body: gerarMensagemAlerta(tipo, insumo) });
+                }
+            };
+
+            const sincronizarAlertas = async () => {
+                const agora = Date.now();
+                for (const insumo of insumos.value) {
+                    const condicoesAtivas = new Set();
+
+                    if (insumo.estoqueAtual <= 0) {
+                        condicoesAtivas.add('estoque_zerado');
+                    } else if (insumo.diasRestantes !== null && insumo.diasRestantes !== undefined &&
+                               insumo.diasRestantes <= (insumo.estoqueMinimoDias || 5)) {
+                        condicoesAtivas.add('estoque_critico');
+                    }
+
+                    const diasSemAuditoria = (agora - insumo.dataUltimaAuditoria) / (1000 * 60 * 60 * 24);
+                    if (diasSemAuditoria >= DIAS_SEM_AUDITORIA_ALERTA) {
+                        condicoesAtivas.add('sem_auditoria');
+                    }
+
+                    for (const tipo of Object.keys(TIPOS_ALERTA)) {
+                        const alertaId = `${insumo.id}_${tipo}`;
+                        const existente = alertas.value.find(a => a.id === alertaId);
+                        const ativo = condicoesAtivas.has(tipo);
+
+                        if (ativo && !existente) {
+                            try {
+                                await db.collection(COL_ALERTAS).doc(alertaId).set({
+                                    insumoId: insumo.id,
+                                    insumoNome: insumo.nome,
+                                    tipo,
+                                    mensagem: gerarMensagemAlerta(tipo, insumo),
+                                    criadoEm: agora,
+                                    lido: false,
+                                    resolvido: false
+                                });
+                                dispararNotificacaoNavegador(tipo, insumo);
+                            } catch (e) { console.error('Erro ao criar alerta:', e); }
+                        } else if (!ativo && existente && !existente.resolvido) {
+                            try {
+                                await db.collection(COL_ALERTAS).doc(alertaId).update({ resolvido: true, resolvidoEm: agora });
+                            } catch (e) { console.error('Erro ao resolver alerta:', e); }
+                        }
+                    }
+                }
+            };
+
+            const alertasNaoLidos = computed(() => alertas.value.filter(a => !a.lido));
+
+            const alertasOrdenados = computed(() => {
+                return [...alertas.value].sort((a, b) => {
+                    if (a.resolvido !== b.resolvido) return a.resolvido ? 1 : -1;
+                    if (a.lido !== b.lido) return a.lido ? 1 : -1;
+                    return b.criadoEm - a.criadoEm;
+                });
+            });
+
+            const marcarAlertaComoLido = async (alerta) => {
+                try {
+                    await db.collection(COL_ALERTAS).doc(alerta.id).update({
+                        lido: true,
+                        lidoPor: usuarioAtual.value ? usuarioAtual.value.email : '',
+                        lidoEm: Date.now()
+                    });
+                } catch (e) {
+                    console.error('Erro ao marcar alerta como lido:', e);
+                }
+            };
+
+            const marcarTodosComoLidos = async () => {
+                try {
+                    await Promise.all(alertasNaoLidos.value.map(a =>
+                        db.collection(COL_ALERTAS).doc(a.id).update({
+                            lido: true,
+                            lidoPor: usuarioAtual.value ? usuarioAtual.value.email : '',
+                            lidoEm: Date.now()
+                        })
+                    ));
+                } catch (e) {
+                    console.error('Erro ao marcar alertas como lidos:', e);
+                }
+            };
+
+            // ---------- Log de auditoria de alterações ----------
+            const registrarLog = async (tipo, insumoId, insumoNome, detalhes) => {
+                try {
+                    await db.collection(COL_LOGS).add({
+                        tipo, insumoId, insumoNome, detalhes,
+                        usuarioEmail: usuarioAtual.value ? usuarioAtual.value.email : 'desconhecido',
+                        timestamp: Date.now()
+                    });
+                } catch (e) { console.error('Erro ao registrar log:', e); }
+            };
+
+            // ---------- CRUD de insumos ----------
+            const salvarInsumo = async () => {
+                const agora = Date.now();
+                const ano = String(new Date(agora).getFullYear());
+                try {
+                    const ref = await db.collection(COL_INSUMOS).add({
+                        nome: form.value.nome,
+                        categoria: normalizarCategoria(form.value.categoria) || '',
+                        unidade: form.value.unidade,
+                        estoqueAtual: form.value.estoqueAtual || 0,
+                        estoqueMinimoDias: form.value.estoqueMinimoDias || 5,
+                        custoUnitario: form.value.custoUnitario || 0,
+                        custoAcumulado: 0,
+                        codigoBarra: form.value.codigoBarra || '',
+                        unidadeFabril: form.value.unidadeFabril || 'Fábrica 1',
+                        fornecedor: { nome: form.value.fornecedorNome || '', contato: form.value.fornecedorContato || '' },
+                        dataUltimaAuditoria: agora,
+                        consumoDiarioCalculado: 0,
+                        diasRestantes: null,
+                        historico: { [ano]: [0,0,0,0,0,0,0,0,0,0,0,0] }
+                    });
+                    await registrarLog('criacao', ref.id, form.value.nome, 'Insumo cadastrado');
+                    form.value = formDefault();
+                    mostrarModalCadastro.value = false;
+                    mostrarToast('Produto cadastrado com sucesso!', 'sucesso');
+                } catch (erro) {
+                    console.error('Erro ao salvar insumo:', erro);
+                    mostrarToast('Erro ao salvar no Firebase. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            // ---------- Importação em massa (Excel/CSV) ----------
+            const importando = ref(false);
+
+            const baixarModeloImportacao = () => {
+                const modelo = [{
+                    Nome: 'Exemplo Insumo', Categoria: 'Limpeza', Unidade: 'kg',
+                    'Estoque Inicial': 10, 'Alerta (dias)': 5, 'Custo Unitario': 12.5,
+                    'Codigo de Barras': '', Fornecedor: '', Contato: '', 'Unidade Fabril': 'Fábrica 1'
+                }];
+                const ws = XLSX.utils.json_to_sheet(modelo);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Modelo');
+                XLSX.writeFile(wb, 'modelo-importacao-insumos.xlsx');
+            };
+
+            const importarArquivo = async (evento) => {
+                const arquivo = evento.target.files[0];
+                if (!arquivo) return;
+                importando.value = true;
+                try {
+                    const dados = await arquivo.arrayBuffer();
+                    const wb = XLSX.read(dados, { type: 'array' });
+                    const linhas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+
+                    const agora = Date.now();
+                    const ano = String(new Date(agora).getFullYear());
+                    let sucesso = 0, ignoradas = 0;
+
+                    for (const linha of linhas) {
+                        const nome = String(linha['Nome'] || linha['nome'] || '').trim();
+                        if (!nome) { ignoradas++; continue; }
+
+                        const categoria = normalizarCategoria(linha['Categoria'] || linha['categoria'] || '');
+                        const unidade = String(linha['Unidade'] || linha['unidade'] || 'kg').trim().toLowerCase() || 'kg';
+                        const estoqueAtual = Number(linha['Estoque Inicial'] || linha['Estoque Atual'] || linha['estoque'] || 0) || 0;
+                        const estoqueMinimoDias = Number(linha['Alerta (dias)'] || linha['Estoque Minimo'] || linha['estoqueMinimoDias'] || 5) || 5;
+                        const custoUnitario = Number(linha['Custo Unitario'] || linha['Custo Unitário'] || linha['custoUnitario'] || 0) || 0;
+                        const codigoBarra = String(linha['Codigo de Barras'] || linha['Código de Barras'] || linha['codigoBarra'] || '').trim();
+                        const fornecedorNome = String(linha['Fornecedor'] || '').trim();
+                        const fornecedorContato = String(linha['Contato'] || '').trim();
+                        const unidadeFabril = String(linha['Unidade Fabril'] || linha['unidadeFabril'] || unidadeFabrilSelecionada.value || 'Fábrica 1').trim() || 'Fábrica 1';
+
+                        try {
+                            await db.collection(COL_INSUMOS).add({
+                                nome, categoria, unidade, estoqueAtual, estoqueMinimoDias, custoUnitario,
+                                custoAcumulado: 0, codigoBarra, unidadeFabril,
+                                fornecedor: { nome: fornecedorNome, contato: fornecedorContato },
+                                dataUltimaAuditoria: agora, consumoDiarioCalculado: 0, diasRestantes: null,
+                                historico: { [ano]: [0,0,0,0,0,0,0,0,0,0,0,0] }
+                            });
+                            sucesso++;
+                        } catch (e) {
+                            console.error('Erro ao importar linha:', linha, e);
+                            ignoradas++;
+                        }
+                    }
+
+                    if (sucesso > 0) await registrarLog('importacao', '-', 'Importação em massa', `${sucesso} insumo(s) importado(s), ${ignoradas} ignorada(s)`);
+                    mostrarToast(`${sucesso} insumo(s) importado(s) com sucesso!`, 'sucesso');
+                    if (ignoradas > 0) mostrarToast(`${ignoradas} linha(s) ignorada(s) (sem nome ou com erro).`, 'info');
+                } catch (erro) {
+                    console.error('Erro ao importar arquivo:', erro);
+                    mostrarToast('Erro ao ler o arquivo. Confira se o formato é .xlsx ou .csv.', 'erro');
+                } finally {
+                    importando.value = false;
+                    evento.target.value = '';
+                }
+            };
+
+            const insumoEditando = ref(null);
+            const formEdicao = ref(null);
+
+            const abrirEdicao = (insumo) => {
+                insumoEditando.value = insumo;
+                formEdicao.value = {
+                    nome: insumo.nome, categoria: insumo.categoria || '', unidade: insumo.unidade,
+                    estoqueMinimoDias: insumo.estoqueMinimoDias || 5, custoUnitario: insumo.custoUnitario || 0,
+                    codigoBarra: insumo.codigoBarra || '', unidadeFabril: insumo.unidadeFabril || 'Fábrica 1',
+                    fornecedorNome: (insumo.fornecedor && insumo.fornecedor.nome) || '',
+                    fornecedorContato: (insumo.fornecedor && insumo.fornecedor.contato) || ''
+                };
+            };
+
+            const salvarEdicao = async () => {
+                try {
+                    await db.collection(COL_INSUMOS).doc(insumoEditando.value.id).update({
+                        nome: formEdicao.value.nome,
+                        categoria: normalizarCategoria(formEdicao.value.categoria) || '',
+                        unidade: formEdicao.value.unidade,
+                        estoqueMinimoDias: formEdicao.value.estoqueMinimoDias || 5,
+                        custoUnitario: formEdicao.value.custoUnitario || 0,
+                        codigoBarra: formEdicao.value.codigoBarra || '',
+                        unidadeFabril: formEdicao.value.unidadeFabril || 'Fábrica 1',
+                        fornecedor: { nome: formEdicao.value.fornecedorNome || '', contato: formEdicao.value.fornecedorContato || '' }
+                    });
+                    await registrarLog('edicao', insumoEditando.value.id, formEdicao.value.nome, 'Dados do insumo atualizados');
+                    insumoEditando.value = null;
+                    mostrarToast('Insumo editado com sucesso!', 'sucesso');
+                } catch (erro) {
+                    console.error('Erro ao editar insumo:', erro);
+                    mostrarToast('Erro ao editar no Firebase. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            const excluirInsumo = async (insumo) => {
+                if (!confirm(`Excluir "${insumo.nome}" definitivamente?`)) return;
+                try {
+                    await db.collection(COL_INSUMOS).doc(insumo.id).delete();
+                    await registrarLog('exclusao', insumo.id, insumo.nome, 'Insumo excluído');
+                    mostrarToast('Insumo excluído com sucesso!', 'sucesso');
+                } catch (erro) {
+                    console.error('Erro ao excluir insumo:', erro);
+                    mostrarToast('Erro ao excluir no Firebase. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            // ---------- Auditoria (contagem física) ----------
+            const salvarAuditoria = async () => {
+                const agora = Date.now();
+                const dataAgora = new Date(agora);
+                const ano = String(dataAgora.getFullYear());
+                const mes = dataAgora.getMonth();
+                const atualizacoes = [];
+
+                insumos.value.forEach(insumo => {
+                    if (insumo.novoEstoque !== null && insumo.novoEstoque !== insumo.estoqueAtual) {
+                        const diasDecorridos = (agora - insumo.dataUltimaAuditoria) / (1000 * 60 * 60 * 24);
+                        const consumido = insumo.estoqueAtual - insumo.novoEstoque;
+
+                        let consumoDiarioCalculado = insumo.consumoDiarioCalculado;
+                        if (consumido > 0 && diasDecorridos > 0) {
+                            consumoDiarioCalculado = consumido / diasDecorridos;
+                        }
+
+                        let diasRestantes = insumo.diasRestantes;
+                        if (consumoDiarioCalculado > 0) {
+                            diasRestantes = insumo.novoEstoque / consumoDiarioCalculado;
+                        }
+
+                        const historico = { ...(insumo.historico || {}) };
+                        const arrayAno = historico[ano] ? [...historico[ano]] : Array(12).fill(0);
+                        if (consumido > 0) arrayAno[mes] = (arrayAno[mes] || 0) + consumido;
+                        historico[ano] = arrayAno;
+
+                        const custoAcumulado = (insumo.custoAcumulado || 0) + (consumido > 0 ? consumido * (insumo.custoUnitario || 0) : 0);
+
+                        atualizacoes.push(
+                            db.collection(COL_INSUMOS).doc(insumo.id).update({
+                                estoqueAtual: insumo.novoEstoque,
+                                dataUltimaAuditoria: agora,
+                                consumoDiarioCalculado,
+                                diasRestantes,
+                                historico,
+                                custoAcumulado
+                            }).then(() => registrarLog('auditoria', insumo.id, insumo.nome,
+                                `Estoque ajustado de ${insumo.estoqueAtual} para ${insumo.novoEstoque} ${insumo.unidade}`))
+                        );
+                    }
+                });
+
+                if (atualizacoes.length > 0) {
+                    try {
+                        await Promise.all(atualizacoes);
+                        mostrarToast('Saldos atualizados com sucesso!', 'sucesso');
+                        abaAtiva.value = 'dashboard';
+                    } catch (erro) {
+                        console.error('Erro ao atualizar auditoria:', erro);
+                        mostrarToast('Erro ao atualizar no Firebase. Veja o console para detalhes.', 'erro');
+                    }
+                }
+            };
+
+            const obterCorStatus = (insumo) => {
+                if (insumo.diasRestantes === null || insumo.diasRestantes === undefined) return 'bg-prata';
+                const limite = insumo.estoqueMinimoDias || 5;
+                if (insumo.diasRestantes <= limite) return 'bg-rose-500';
+                if (insumo.diasRestantes <= limite * 2) return 'bg-amber-400';
+                return 'bg-verdeclaro';
+            };
+
+            // ---------- Geração automática de e-mail de acesso ----------
+            // Ex: "Jean Thielis Braga Felipe" -> "jean.thielis@insumo.com.br"
+            const normalizarTexto = (texto) => (texto || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+                .toLowerCase()
+                .replace(/[^a-z]/g, ''); // mantém só letras
+
+            const gerarEmailBase = (nomeCompleto) => {
+                const partes = (nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
+                if (partes.length === 0) return '';
+                const primeiro = normalizarTexto(partes[0]);
+                const segundo = partes.length > 1 ? normalizarTexto(partes[1]) : '';
+                return segundo ? `${primeiro}.${segundo}` : primeiro;
+            };
+
+            const gerarEmailUnico = (nomeCompleto) => {
+                const base = gerarEmailBase(nomeCompleto);
+                if (!base) return '';
+                const emailsExistentes = new Set([
+                    ...usuarios.value.map(u => (u.email || '').toLowerCase()),
+                    ...convites.value.map(c => (c.email || '').toLowerCase())
+                ]);
+                let email = `${base}@${DOMINIO_EMAIL}`;
+                let contador = 2;
+                while (emailsExistentes.has(email)) {
+                    email = `${base}${contador}@${DOMINIO_EMAIL}`;
+                    contador++;
+                }
+                return email;
+            };
+
+            const atualizarEmailGerado = () => {
+                if (!formConvite.value.emailEditadoManualmente) {
+                    formConvite.value.email = gerarEmailUnico(formConvite.value.nome);
+                }
+            };
+
+            // ---------- Gerenciar pessoas e níveis de acesso ----------
+            // Combina contas já ativas (coleção "usuarios") com convites ainda não usados
+            // (coleção "convites") numa única lista para o painel do administrador.
+            const pessoasCombinadas = computed(() => {
+                const ativos = usuarios.value.map(u => ({
+                    id: u.id, nome: u.nome || '', email: u.email, nivelAcesso: u.role, status: 'ativo'
+                }));
+                const pendentes = convites.value
+                    .filter(c => !c.usado)
+                    .map(c => ({ id: c.id, nome: c.nome || '', email: c.email, nivelAcesso: c.nivelAcesso, status: 'convidado' }));
+                return [...ativos, ...pendentes].sort((a, b) => (a.nome || a.email).localeCompare(b.nome || b.email));
+            });
+
+            const enviarConvite = async () => {
+                const emailLower = formConvite.value.email.toLowerCase().trim();
+                const nivel = souAdmin.value ? formConvite.value.nivelAcesso : 'inspetor';
+                try {
+                    await db.collection(COL_CONVITES).doc(emailLower).set({
+                        nome: formConvite.value.nome,
+                        email: emailLower,
+                        nivelAcesso: nivel,
+                        usado: false,
+                        criadoPor: usuarioAtual.value ? usuarioAtual.value.email : '',
+                        criadoEm: Date.now()
+                    });
+                    await registrarLog('convite', emailLower, formConvite.value.nome || emailLower, `Pessoa cadastrada com nível ${nivel}`);
+                    mostrarToast(`Pessoa cadastrada com sucesso! Nível: ${nivel}, e-mail: ${emailLower}`, 'sucesso', 5000);
+                    formConvite.value = { nome: '', email: '', nivelAcesso: 'inspetor', emailEditadoManualmente: false };
+                    mostrarModalPessoa.value = false;
+                } catch (erro) {
+                    console.error('Erro ao cadastrar pessoa:', erro);
+                    mostrarToast('Erro ao cadastrar pessoa. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            const alterarNivelPessoa = async (pessoa, novoNivel) => {
+                try {
+                    if (pessoa.status === 'ativo') {
+                        await db.collection(COL_USUARIOS).doc(pessoa.id).update({ role: novoNivel });
+                    } else {
+                        await db.collection(COL_CONVITES).doc(pessoa.id).update({ nivelAcesso: novoNivel });
+                    }
+                    await registrarLog('nivel-acesso', pessoa.id, pessoa.nome || pessoa.email, `Nível de acesso alterado para ${novoNivel}`);
+                    mostrarToast('Nível de acesso atualizado com sucesso!', 'sucesso');
+                } catch (erro) {
+                    console.error('Erro ao alterar nível de acesso:', erro);
+                    mostrarToast('Erro ao alterar nível de acesso. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            const excluirConvite = async (pessoa) => {
+                if (!confirm(`Cancelar o convite de "${pessoa.nome || pessoa.email}"?`)) return;
+                try {
+                    await db.collection(COL_CONVITES).doc(pessoa.id).delete();
+                    mostrarToast('Convite cancelado.', 'info');
+                } catch (erro) {
+                    console.error('Erro ao cancelar convite:', erro);
+                    mostrarToast('Erro ao cancelar convite. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            // ---------- Leitor de código de barras ----------
+            const scannerAberto = ref(false);
+            let html5QrCode = null;
+
+            const abrirScanner = () => {
+                scannerAberto.value = true;
+                nextTick(() => {
+                    html5QrCode = new Html5Qrcode('leitor-codigo');
+                    html5QrCode.start(
+                        { facingMode: 'environment' },
+                        { fps: 10, qrbox: 200 },
+                        (textoDecodificado) => {
+                            fecharScanner();
+                            buscarPorCodigo(textoDecodificado);
+                        },
+                        () => {}
+                    ).catch((erro) => {
+                        mostrarToast('Não foi possível acessar a câmera: ' + erro, 'erro');
+                        scannerAberto.value = false;
+                    });
+                });
+            };
+
+            const fecharScanner = () => {
+                if (html5QrCode) {
+                    html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+                }
+                scannerAberto.value = false;
+            };
+
+            const buscarPorCodigo = (codigo) => {
+                const insumo = insumos.value.find(i => i.codigoBarra && i.codigoBarra === codigo);
+                if (!insumo) {
+                    mostrarToast('Nenhum insumo encontrado com este código.', 'erro');
+                    return;
+                }
+                mostrarToast(`Insumo encontrado: ${insumo.nome}`, 'sucesso');
+                nextTick(() => {
+                    const el = document.getElementById('auditoria-' + insumo.id);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('destaque-scan');
+                        setTimeout(() => el.classList.remove('destaque-scan'), 2500);
+                    }
+                });
+            };
+
+            // ---------- Exportação ----------
+            const exportarExcel = () => {
+                const linhas = insumosDaUnidade.value.map(i => ({
+                    Nome: i.nome,
+                    Categoria: i.categoria || '',
+                    Unidade: i.unidade,
+                    'Unidade Fabril': i.unidadeFabril || 'Fábrica 1',
+                    'Estoque Atual': i.estoqueAtual,
+                    'Dias Restantes': i.diasRestantes !== null && i.diasRestantes !== undefined ? Number(i.diasRestantes.toFixed(1)) : '',
+                    'Custo Unitário': i.custoUnitario || 0,
+                    'Custo Acumulado': i.custoAcumulado || 0,
+                    Fornecedor: (i.fornecedor && i.fornecedor.nome) || ''
+                }));
+                const ws = XLSX.utils.json_to_sheet(linhas);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Insumos');
+                XLSX.writeFile(wb, `relatorio-insumos-${Date.now()}.xlsx`);
+            };
+
+            const exportarPDF = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.setFontSize(14);
+                doc.text('Relatório de Insumos - Fábrica 2', 14, 15);
+                const linhas = insumosDaUnidade.value.map(i => [
+                    i.nome, i.categoria || '-', `${i.estoqueAtual} ${i.unidade}`,
+                    i.diasRestantes !== null && i.diasRestantes !== undefined ? i.diasRestantes.toFixed(1) : '-',
+                    `R$ ${(i.custoUnitario || 0).toFixed(2)}`,
+                    `R$ ${(i.custoAcumulado || 0).toFixed(2)}`
+                ]);
+                doc.autoTable({
+                    head: [['Insumo', 'Categoria', 'Estoque', 'Dias Rest.', 'Custo Unit.', 'Custo Acum.']],
+                    body: linhas,
+                    startY: 22,
+                    styles: { fontSize: 9 },
+                    headStyles: { fillColor: [16, 52, 166] }
+                });
+                doc.save(`relatorio-insumos-${Date.now()}.pdf`);
+            };
+
+            // ---------- Manutenção: padronizar categorias já cadastradas ----------
+            const normalizarCategoriasExistentes = async () => {
+                const paraAtualizar = insumos.value.filter(i => i.categoria && i.categoria !== normalizarCategoria(i.categoria));
+                if (paraAtualizar.length === 0) {
+                    mostrarToast('Todas as categorias já estão padronizadas!', 'info');
+                    return;
+                }
+                if (!confirm(`Isso vai padronizar a categoria de ${paraAtualizar.length} insumo(s). Continuar?`)) return;
+                try {
+                    await Promise.all(paraAtualizar.map(i =>
+                        db.collection(COL_INSUMOS).doc(i.id).update({ categoria: normalizarCategoria(i.categoria) })
+                    ));
+                    await registrarLog('manutencao', '-', 'Categorias', `${paraAtualizar.length} insumo(s) com categoria padronizada`);
+                    mostrarToast(`${paraAtualizar.length} insumo(s) com categoria padronizada!`, 'sucesso');
+                } catch (erro) {
+                    console.error('Erro ao padronizar categorias:', erro);
+                    mostrarToast('Erro ao padronizar categorias. Veja o console para detalhes.', 'erro');
+                }
+            };
+
+            return {
+                toasts, removerToast,
+                usuarioAtual, perfil, souAdmin, souSupervisor, souInspetor, modoRegistro, authForm, authErro, entrar, registrar, sair,
+                podeCadastrarProduto, podeEditarExcluir, podeVerLogs, podeCadastrarPessoa,
+                abaAtiva, menuAberto, mostrarModalCadastro, mostrarModalPessoa, irPara, insumos, insumosFiltrados, carregando, erroConexao,
+                categorias, filtroCategoria, alertasCriticos,
+                unidadeFabrilSelecionada, unidadesFabris, insumosDaUnidade,
+                buscaTexto, ordenacao, kpis, custoPorCategoria,
+                form, salvarInsumo, salvarAuditoria, obterCorStatus,
+                importando, baixarModeloImportacao, importarArquivo,
+                insumoEditando, formEdicao, abrirEdicao, salvarEdicao, excluirInsumo,
+                logs, usuarios, convites, formConvite, dominioEmail, atualizarEmailGerado, pessoasCombinadas, enviarConvite, alterarNivelPessoa, excluirConvite,
+                alertas, alertasNaoLidos, alertasOrdenados, tiposAlerta: TIPOS_ALERTA, marcarAlertaComoLido, marcarTodosComoLidos,
+                scannerAberto, abrirScanner, fecharScanner,
+                exportarExcel, exportarPDF, normalizarCategoriasExistentes
+            };
+        }
+    });
+
+    app.component('chart-consumo', ChartConsumo);
+    app.component('grafico-categorias', GraficoCategorias);
+    app.mount('#app');
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+    }
 </script>
 
 </body>
