@@ -50,12 +50,12 @@
         .toast-leave-to { opacity: 0; transform: translateX(20px); }
     </style>
 </head>
-<body class="flex justify-center h-screen overflow-hidden">
+<body class="h-screen overflow-hidden bg-fundo">
 
-<div id="app" class="w-full max-w-md bg-white h-full flex flex-col relative shadow-2xl">
+<div id="app" class="w-full h-full bg-white flex flex-col md:flex-row relative shadow-2xl">
 
     <!-- ===================== TOASTS (notificações) ===================== -->
-    <div class="absolute top-4 inset-x-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div class="absolute top-4 inset-x-4 md:left-auto md:right-4 md:w-96 z-50 flex flex-col gap-2 pointer-events-none">
         <transition-group name="toast">
             <div v-for="toast in toasts" :key="toast.id"
                  class="pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-bold text-white"
@@ -79,9 +79,12 @@
 
     <!-- ===================== TELA DE LOGIN ===================== -->
     <div v-if="!usuarioAtual" class="flex-1 flex flex-col justify-center items-center p-6 bg-fundo">
-        <i class="fa-solid fa-industry text-5xl text-egipcio mb-4"></i>
-        <h1 class="text-2xl font-bold text-egipcio mb-1">Fábrica 2</h1>
-        <p class="text-sm text-gray-500 mb-6">{{ modoRegistro ? 'Criar nova conta' : 'Entrar no sistema' }}</p>
+      <div class="w-full max-w-sm">
+        <div class="flex flex-col items-center">
+            <i class="fa-solid fa-industry text-5xl text-egipcio mb-4"></i>
+            <h1 class="text-2xl font-bold text-egipcio mb-1">Fábrica 2</h1>
+            <p class="text-sm text-gray-500 mb-6">{{ modoRegistro ? 'Criar nova conta' : 'Entrar no sistema' }}</p>
+        </div>
 
         <form @submit.prevent="modoRegistro ? registrar() : entrar()" class="w-full space-y-3">
             <input v-if="modoRegistro" v-model="authForm.nome" type="text" required placeholder="Nome completo"
@@ -99,14 +102,54 @@
             </button>
         </form>
 
-        <button @click="modoRegistro = !modoRegistro; authErro = null" class="text-sm text-egipcio mt-4 underline">
-            {{ modoRegistro ? 'Já tenho conta, entrar' : 'Não tenho conta, cadastrar' }}
-        </button>
+        <div class="text-center">
+            <button @click="modoRegistro = !modoRegistro; authErro = null" class="text-sm text-egipcio mt-4 underline">
+                {{ modoRegistro ? 'Já tenho conta, entrar' : 'Não tenho conta, cadastrar' }}
+            </button>
+        </div>
+      </div>
     </div>
 
     <!-- ===================== APP PRINCIPAL ===================== -->
     <template v-else>
-        <header class="bg-egipcio text-white p-4 shadow-md z-10 flex justify-between items-center relative">
+        <!-- Sidebar (desktop) -->
+        <aside class="hidden md:flex md:flex-col md:w-64 bg-egipcio text-white p-5 shrink-0 h-full">
+            <h1 class="text-xl font-bold tracking-wide mb-8"><i class="fa-solid fa-industry mr-2"></i> Fábrica 2</h1>
+            <nav class="flex flex-col gap-1 flex-1">
+                <button @click="irPara('dashboard')" :class="abaAtiva === 'dashboard' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left">
+                    <i class="fa-solid fa-chart-line w-4"></i> Painel
+                </button>
+                <button v-if="podeCadastrarProduto" @click="irPara('cadastro')" :class="abaAtiva === 'cadastro' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left">
+                    <i class="fa-solid fa-plus w-4"></i> Cadastrar Insumo
+                </button>
+                <button @click="irPara('auditoria')" :class="abaAtiva === 'auditoria' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left">
+                    <i class="fa-solid fa-clipboard-check w-4"></i> Auditoria
+                </button>
+                <button @click="irPara('alertas')" :class="abaAtiva === 'alertas' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left relative">
+                    <i class="fa-solid fa-bell w-4"></i> Alertas
+                    <span v-if="alertasNaoLidos.length > 0" class="ml-auto bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{{ alertasNaoLidos.length > 9 ? '9+' : alertasNaoLidos.length }}</span>
+                </button>
+                <button v-if="souAdmin" @click="irPara('relatorios')" :class="abaAtiva === 'relatorios' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left">
+                    <i class="fa-solid fa-file-export w-4"></i> Relatórios
+                </button>
+                <button v-if="podeVerLogs" @click="irPara('logs')" :class="abaAtiva === 'logs' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left">
+                    <i class="fa-solid fa-clock-rotate-left w-4"></i> Histórico
+                </button>
+                <button v-if="podeCadastrarPessoa" @click="irPara('pessoas')" :class="abaAtiva === 'pessoas' ? 'bg-white text-egipcio' : 'text-blue-100 hover:bg-blue-900'" class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-sm text-left">
+                    <i class="fa-solid fa-users-gear w-4"></i> {{ souAdmin ? 'Níveis de Acesso' : 'Cadastro de Pessoas' }}
+                </button>
+            </nav>
+            <div class="border-t border-blue-900 pt-4 mt-4">
+                <span class="text-[10px] bg-white text-egipcio px-2 py-1 rounded-full font-bold uppercase inline-block mb-3">{{ perfil || '...' }}</span>
+                <button @click="sair" class="flex items-center gap-2 text-sm text-blue-200 hover:text-white">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sair
+                </button>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+
+        <header class="md:hidden bg-egipcio text-white p-4 shadow-md z-10 flex justify-between items-center relative">
             <h1 class="text-xl font-bold tracking-wide"><i class="fa-solid fa-industry mr-2"></i> Fábrica 2</h1>
             <div class="flex items-center gap-2">
                 <span class="text-[10px] bg-white text-egipcio px-2 py-1 rounded-full font-bold uppercase">{{ perfil || '...' }}</span>
@@ -141,16 +184,74 @@
             </div>
         </header>
 
-        <main class="flex-1 overflow-y-auto p-4 pb-24 bg-gray-50" @click="menuAberto = false">
+        <!-- Barra superior (desktop) -->
+        <div class="hidden md:flex items-center justify-end bg-white border-b border-gray-200 px-6 py-3">
+            <button @click="irPara('alertas')" class="relative text-egipcio text-lg px-2">
+                <i class="fa-solid fa-bell"></i>
+                <span v-if="alertasNaoLidos.length > 0" class="absolute -top-1 -right-0 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {{ alertasNaoLidos.length > 9 ? '9+' : alertasNaoLidos.length }}
+                </span>
+            </button>
+        </div>
+
+        <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 bg-gray-50" @click="menuAberto = false">
 
             <!-- ---------- DASHBOARD ---------- -->
             <div v-if="abaAtiva === 'dashboard'" class="animate-fade-in">
                 <h2 class="text-xl font-bold text-egipcio mb-4 border-b-2 border-prata pb-2">Status e Gráficos</h2>
 
+                <div v-if="unidadesFabris.length > 1" class="flex items-center gap-2 mb-4 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                    <i class="fa-solid fa-building text-egipcio text-sm"></i>
+                    <select v-model="unidadeFabrilSelecionada" class="text-sm font-bold text-egipcio flex-1 focus:outline-none bg-transparent">
+                        <option :value="null">Todas as unidades</option>
+                        <option v-for="u in unidadesFabris" :key="u" :value="u">{{ u }}</option>
+                    </select>
+                </div>
+
+                <!-- KPIs -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-white border border-gray-200 rounded-xl p-3">
+                        <p class="text-[10px] text-gray-400 uppercase font-bold">Insumos</p>
+                        <p class="text-xl font-bold text-egipcio">{{ kpis.totalInsumos }}</p>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-3">
+                        <p class="text-[10px] text-gray-400 uppercase font-bold">Custo Acumulado</p>
+                        <p class="text-xl font-bold text-egipcio">R$ {{ kpis.custoTotalAcumulado.toFixed(0) }}</p>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-3 col-span-2 md:col-span-1">
+                        <p class="text-[10px] text-gray-400 uppercase font-bold">Mais Consumido (ano)</p>
+                        <p class="text-sm font-bold text-egipcio truncate">{{ kpis.maisConsumido ? kpis.maisConsumido.nome : '-' }}</p>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-xl p-3">
+                        <p class="text-[10px] text-gray-400 uppercase font-bold">Alertas Ativos</p>
+                        <p class="text-xl font-bold text-red-500">{{ alertasCriticos.length }}</p>
+                    </div>
+                </div>
+
+                <div v-if="Object.keys(custoPorCategoria).length > 0" class="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+                    <p class="text-xs font-bold text-gray-500 uppercase mb-2">Custo Acumulado por Categoria</p>
+                    <grafico-categorias :dados="custoPorCategoria"></grafico-categorias>
+                </div>
+
                 <div v-if="alertasCriticos.length > 0" class="bg-red-50 border border-red-300 text-red-700 rounded-lg p-3 mb-4 text-sm">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>
                     <strong>{{ alertasCriticos.length }}</strong> insumo(s) com estoque crítico:
                     {{ alertasCriticos.map(i => i.nome).join(', ') }}
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input v-model="buscaTexto" type="text" placeholder="Buscar insumo por nome..." class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-egipcio">
+                    </div>
+                    <select v-model="ordenacao" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-egipcio">
+                        <option value="nome-asc">Nome (A-Z)</option>
+                        <option value="nome-desc">Nome (Z-A)</option>
+                        <option value="estoque-asc">Estoque (menor primeiro)</option>
+                        <option value="estoque-desc">Estoque (maior primeiro)</option>
+                        <option value="dias-asc">Dias restantes (menor primeiro)</option>
+                        <option value="dias-desc">Dias restantes (maior primeiro)</option>
+                    </select>
                 </div>
 
                 <div v-if="categorias.length > 0" class="flex gap-2 overflow-x-auto mb-4 pb-1">
@@ -175,6 +276,7 @@
                     <p>Nenhum dado para exibir.</p>
                 </div>
 
+                <div class="md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-4">
                 <div v-for="insumo in insumosFiltrados" :key="insumo.id" class="bg-white border border-gray-200 rounded-xl p-4 mb-4 shadow-sm relative overflow-hidden">
                     <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="obterCorStatus(insumo)"></div>
 
@@ -223,6 +325,7 @@
                             <i class="fa-solid fa-trash mr-1"></i> Excluir
                         </button>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -277,10 +380,31 @@
                         </div>
                     </div>
 
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Unidade Fabril</label>
+                        <input v-model="form.unidadeFabril" type="text" list="lista-unidades-fabris" placeholder="Ex: Fábrica 1" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-egipcio">
+                        <datalist id="lista-unidades-fabris">
+                            <option v-for="u in unidadesFabris" :key="u" :value="u"></option>
+                        </datalist>
+                    </div>
+
                     <button type="submit" class="w-full bg-egipcio text-white font-bold py-3 rounded-lg mt-6 shadow-md hover:bg-blue-900">
                         <i class="fa-solid fa-check mr-2"></i> Cadastrar
                     </button>
                 </form>
+
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <h3 class="text-sm font-bold text-gray-700 mb-1"><i class="fa-solid fa-file-arrow-up mr-1 text-egipcio"></i> Importar em massa</h3>
+                    <p class="text-xs text-gray-500 mb-3">Cadastre vários insumos de uma vez a partir de uma planilha Excel ou CSV.</p>
+                    <button @click="baixarModeloImportacao" type="button" class="w-full bg-gray-100 text-gray-700 font-bold py-2.5 rounded-lg mb-2 hover:bg-gray-200 border border-gray-200 text-sm">
+                        <i class="fa-solid fa-download mr-2"></i> Baixar planilha modelo
+                    </button>
+                    <label class="w-full flex items-center justify-center gap-2 bg-egipcio text-white font-bold py-2.5 rounded-lg cursor-pointer hover:bg-blue-900 text-sm">
+                        <i class="fa-solid" :class="importando ? 'fa-spinner fa-spin' : 'fa-file-import'"></i>
+                        {{ importando ? 'Importando...' : 'Selecionar arquivo (.xlsx, .csv)' }}
+                        <input type="file" accept=".xlsx,.xls,.csv" class="hidden" :disabled="importando" @change="importarArquivo">
+                    </label>
+                </div>
             </div>
             <div v-if="abaAtiva === 'cadastro' && !podeCadastrarProduto" class="text-center text-gray-400 mt-10">
                 <i class="fa-solid fa-lock text-4xl mb-3"></i>
@@ -297,7 +421,7 @@
                 </div>
                 <p class="text-sm text-gray-500 mb-4 border-b-2 border-prata pb-2">Contagem real de chão de fábrica.</p>
 
-                <div v-for="insumo in insumos" :key="'auditoria-'+insumo.id" :id="'auditoria-'+insumo.id"
+                <div v-for="insumo in insumosDaUnidade" :key="'auditoria-'+insumo.id" :id="'auditoria-'+insumo.id"
                      class="bg-white border border-gray-200 rounded-xl p-4 mb-3 flex items-center justify-between shadow-sm transition-colors">
                     <div class="flex-1">
                         <h3 class="font-bold text-gray-800">{{ insumo.nome }}</h3>
@@ -310,7 +434,7 @@
                     </div>
                 </div>
 
-                <button v-if="insumos.length > 0" @click="salvarAuditoria" class="w-full bg-verdeclaro text-green-900 font-bold py-3 rounded-lg mt-4 shadow-md border border-green-400">
+                <button v-if="insumosDaUnidade.length > 0" @click="salvarAuditoria" class="w-full bg-verdeclaro text-green-900 font-bold py-3 rounded-lg mt-4 shadow-md border border-green-400">
                     <i class="fa-solid fa-calculator mr-2"></i> Atualizar Saldos
                 </button>
 
@@ -459,8 +583,8 @@
         </main>
 
         <!-- ---------- MODAL DE EDIÇÃO ---------- -->
-        <div v-if="insumoEditando" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end">
-            <div class="bg-white w-full max-w-md mx-auto rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto">
+        <div v-if="insumoEditando" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-end md:items-center md:justify-center">
+            <div class="bg-white w-full max-w-md mx-auto rounded-t-2xl md:rounded-2xl p-4 max-h-[85vh] overflow-y-auto">
                 <h3 class="text-lg font-bold text-egipcio mb-3">Editar Insumo</h3>
                 <form @submit.prevent="salvarEdicao" class="space-y-3">
                     <input v-model="formEdicao.nome" type="text" required placeholder="Nome" class="w-full border border-gray-300 rounded-lg p-3">
@@ -477,6 +601,7 @@
                         <input v-model.number="formEdicao.custoUnitario" type="number" step="0.01" placeholder="Custo unitário" class="w-full border border-gray-300 rounded-lg p-3">
                     </div>
                     <input v-model="formEdicao.codigoBarra" type="text" placeholder="Código de barras / QR" class="w-full border border-gray-300 rounded-lg p-3">
+                    <input v-model="formEdicao.unidadeFabril" type="text" list="lista-unidades-fabris" placeholder="Unidade Fabril" class="w-full border border-gray-300 rounded-lg p-3">
                     <div class="grid grid-cols-2 gap-3">
                         <input v-model="formEdicao.fornecedorNome" type="text" placeholder="Fornecedor" class="w-full border border-gray-300 rounded-lg p-3">
                         <input v-model="formEdicao.fornecedorContato" type="text" placeholder="Contato" class="w-full border border-gray-300 rounded-lg p-3">
@@ -489,7 +614,7 @@
             </div>
         </div>
 
-        <nav class="absolute bottom-0 w-full bg-white border-t border-gray-200 flex justify-around items-center h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20">
+        <nav class="md:hidden absolute bottom-0 w-full bg-white border-t border-gray-200 flex justify-around items-center h-16 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-20">
             <button @click="irPara('dashboard')" :class="{'text-egipcio': abaAtiva === 'dashboard', 'text-gray-400': abaAtiva !== 'dashboard'}" class="flex flex-col items-center w-1/3">
                 <i class="fa-solid fa-chart-line text-xl mb-1"></i>
                 <span class="text-[10px] font-bold">Painel</span>
@@ -502,6 +627,8 @@
                 <span class="text-[10px] font-bold">Auditar</span>
             </button>
         </nav>
+
+        </div>
     </template>
 </div>
 
@@ -570,6 +697,53 @@
             onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
 
             return { canvasEl, totalAnual, anosDisponiveis, anoSelecionado };
+        }
+    };
+
+    // Componente Vue para o gráfico comparativo de custo por categoria
+    const GraficoCategorias = {
+        props: ['dados'], // { categoria: custoTotal }
+        template: `<div class="relative h-48 w-full"><canvas ref="canvasEl"></canvas></div>`,
+        setup(props) {
+            const canvasEl = ref(null);
+            let chartInstance = null;
+
+            const renderizar = () => {
+                if (!canvasEl.value) return;
+                if (chartInstance) chartInstance.destroy();
+                const labels = Object.keys(props.dados || {});
+                const valores = Object.values(props.dados || {});
+                const ctx = canvasEl.value.getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Custo Acumulado (R$)',
+                            data: valores,
+                            backgroundColor: '#1034A6',
+                            borderRadius: 4,
+                            hoverBackgroundColor: '#90EE90'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                            y: { ticks: { font: { size: 10 } } }
+                        }
+                    }
+                });
+            };
+
+            onMounted(renderizar);
+            watch(() => props.dados, renderizar, { deep: true });
+            onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
+
+            return { canvasEl };
         }
     };
 
@@ -714,11 +888,15 @@
             const formDefault = () => ({
                 nome: '', categoria: '', unidade: 'kg', estoqueAtual: 0,
                 estoqueMinimoDias: 5, custoUnitario: 0, codigoBarra: '',
-                fornecedorNome: '', fornecedorContato: ''
+                fornecedorNome: '', fornecedorContato: '', unidadeFabril: 'Fábrica 1'
             });
             const form = ref(formDefault());
 
-            const irPara = (aba) => { abaAtiva.value = aba; menuAberto.value = false; };
+            const irPara = (aba) => {
+                abaAtiva.value = aba;
+                menuAberto.value = false;
+                if (aba === 'cadastro') form.value.unidadeFabril = unidadeFabrilSelecionada.value || 'Fábrica 1';
+            };
 
             let unsubscribeInsumos = null;
             let unsubscribeLogs = null;
@@ -790,9 +968,23 @@
                     .join(' ');
             };
 
+            // Multi-unidade: cada insumo pertence a uma "unidade fabril" (Fábrica 1, 2, 3...).
+            // Um seletor global filtra tudo (dashboard, auditoria, KPIs, relatórios) por unidade.
+            const unidadeFabrilSelecionada = ref(null); // null = todas as unidades
+
+            const unidadesFabris = computed(() => {
+                const set = new Set(insumos.value.map(i => i.unidadeFabril || 'Fábrica 1'));
+                return Array.from(set).sort();
+            });
+
+            const insumosDaUnidade = computed(() => {
+                if (!unidadeFabrilSelecionada.value) return insumos.value;
+                return insumos.value.filter(i => (i.unidadeFabril || 'Fábrica 1') === unidadeFabrilSelecionada.value);
+            });
+
             const categorias = computed(() => {
                 const mapa = new Map(); // chave normalizada (lowercase) -> rótulo padronizado para exibir
-                insumos.value.forEach(i => {
+                insumosDaUnidade.value.forEach(i => {
                     if (!i.categoria) return;
                     const chave = i.categoria.trim().toLowerCase();
                     if (chave && !mapa.has(chave)) mapa.set(chave, normalizarCategoria(i.categoria));
@@ -800,15 +992,67 @@
                 return Array.from(mapa.values()).sort();
             });
 
+            // Busca por nome + ordenação (dashboard)
+            const buscaTexto = ref('');
+            const ordenacao = ref('nome-asc');
+
             const insumosFiltrados = computed(() => {
-                if (!filtroCategoria.value) return insumos.value;
-                const alvo = filtroCategoria.value.trim().toLowerCase();
-                return insumos.value.filter(i => (i.categoria || '').trim().toLowerCase() === alvo);
+                let lista = insumosDaUnidade.value;
+
+                if (filtroCategoria.value) {
+                    const alvo = filtroCategoria.value.trim().toLowerCase();
+                    lista = lista.filter(i => (i.categoria || '').trim().toLowerCase() === alvo);
+                }
+
+                if (buscaTexto.value.trim()) {
+                    const termo = buscaTexto.value.trim().toLowerCase();
+                    lista = lista.filter(i => i.nome.toLowerCase().includes(termo));
+                }
+
+                const ordenada = [...lista];
+                ordenada.sort((a, b) => {
+                    switch (ordenacao.value) {
+                        case 'nome-desc': return b.nome.localeCompare(a.nome);
+                        case 'estoque-asc': return a.estoqueAtual - b.estoqueAtual;
+                        case 'estoque-desc': return b.estoqueAtual - a.estoqueAtual;
+                        case 'dias-asc': return (a.diasRestantes ?? Infinity) - (b.diasRestantes ?? Infinity);
+                        case 'dias-desc': return (b.diasRestantes ?? -Infinity) - (a.diasRestantes ?? -Infinity);
+                        default: return a.nome.localeCompare(b.nome);
+                    }
+                });
+                return ordenada;
             });
 
             const alertasCriticos = computed(() =>
-                insumos.value.filter(i => i.diasRestantes !== null && i.diasRestantes !== undefined && i.diasRestantes <= (i.estoqueMinimoDias || 5))
+                insumosDaUnidade.value.filter(i => i.diasRestantes !== null && i.diasRestantes !== undefined && i.diasRestantes <= (i.estoqueMinimoDias || 5))
             );
+
+            // ---------- KPIs e gráfico comparativo por categoria ----------
+            const kpis = computed(() => {
+                const lista = insumosDaUnidade.value;
+                const anoAtual = String(new Date().getFullYear());
+                const totalInsumos = lista.length;
+                const custoTotalAcumulado = lista.reduce((acc, i) => acc + (i.custoAcumulado || 0), 0);
+
+                let maisConsumido = null;
+                let maiorConsumo = -1;
+                lista.forEach(i => {
+                    const arr = (i.historico && i.historico[anoAtual]) || [];
+                    const total = arr.reduce((a, b) => a + b, 0);
+                    if (total > maiorConsumo) { maiorConsumo = total; maisConsumido = i; }
+                });
+
+                return { totalInsumos, custoTotalAcumulado, maisConsumido: maiorConsumo > 0 ? maisConsumido : null };
+            });
+
+            const custoPorCategoria = computed(() => {
+                const mapa = {};
+                insumosDaUnidade.value.forEach(i => {
+                    const cat = i.categoria || 'Sem categoria';
+                    mapa[cat] = (mapa[cat] || 0) + (i.custoAcumulado || 0);
+                });
+                return mapa;
+            });
 
             // ---------- Sistema de Alertas (persistido no Firestore) ----------
             // Gera automaticamente alertas de: estoque zerado, estoque crítico e
@@ -933,6 +1177,7 @@
                         custoUnitario: form.value.custoUnitario || 0,
                         custoAcumulado: 0,
                         codigoBarra: form.value.codigoBarra || '',
+                        unidadeFabril: form.value.unidadeFabril || 'Fábrica 1',
                         fornecedor: { nome: form.value.fornecedorNome || '', contato: form.value.fornecedorContato || '' },
                         dataUltimaAuditoria: agora,
                         consumoDiarioCalculado: 0,
@@ -949,6 +1194,75 @@
                 }
             };
 
+            // ---------- Importação em massa (Excel/CSV) ----------
+            const importando = ref(false);
+
+            const baixarModeloImportacao = () => {
+                const modelo = [{
+                    Nome: 'Exemplo Insumo', Categoria: 'Limpeza', Unidade: 'kg',
+                    'Estoque Inicial': 10, 'Alerta (dias)': 5, 'Custo Unitario': 12.5,
+                    'Codigo de Barras': '', Fornecedor: '', Contato: '', 'Unidade Fabril': 'Fábrica 1'
+                }];
+                const ws = XLSX.utils.json_to_sheet(modelo);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Modelo');
+                XLSX.writeFile(wb, 'modelo-importacao-insumos.xlsx');
+            };
+
+            const importarArquivo = async (evento) => {
+                const arquivo = evento.target.files[0];
+                if (!arquivo) return;
+                importando.value = true;
+                try {
+                    const dados = await arquivo.arrayBuffer();
+                    const wb = XLSX.read(dados, { type: 'array' });
+                    const linhas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+
+                    const agora = Date.now();
+                    const ano = String(new Date(agora).getFullYear());
+                    let sucesso = 0, ignoradas = 0;
+
+                    for (const linha of linhas) {
+                        const nome = String(linha['Nome'] || linha['nome'] || '').trim();
+                        if (!nome) { ignoradas++; continue; }
+
+                        const categoria = normalizarCategoria(linha['Categoria'] || linha['categoria'] || '');
+                        const unidade = String(linha['Unidade'] || linha['unidade'] || 'kg').trim().toLowerCase() || 'kg';
+                        const estoqueAtual = Number(linha['Estoque Inicial'] || linha['Estoque Atual'] || linha['estoque'] || 0) || 0;
+                        const estoqueMinimoDias = Number(linha['Alerta (dias)'] || linha['Estoque Minimo'] || linha['estoqueMinimoDias'] || 5) || 5;
+                        const custoUnitario = Number(linha['Custo Unitario'] || linha['Custo Unitário'] || linha['custoUnitario'] || 0) || 0;
+                        const codigoBarra = String(linha['Codigo de Barras'] || linha['Código de Barras'] || linha['codigoBarra'] || '').trim();
+                        const fornecedorNome = String(linha['Fornecedor'] || '').trim();
+                        const fornecedorContato = String(linha['Contato'] || '').trim();
+                        const unidadeFabril = String(linha['Unidade Fabril'] || linha['unidadeFabril'] || unidadeFabrilSelecionada.value || 'Fábrica 1').trim() || 'Fábrica 1';
+
+                        try {
+                            await db.collection(COL_INSUMOS).add({
+                                nome, categoria, unidade, estoqueAtual, estoqueMinimoDias, custoUnitario,
+                                custoAcumulado: 0, codigoBarra, unidadeFabril,
+                                fornecedor: { nome: fornecedorNome, contato: fornecedorContato },
+                                dataUltimaAuditoria: agora, consumoDiarioCalculado: 0, diasRestantes: null,
+                                historico: { [ano]: [0,0,0,0,0,0,0,0,0,0,0,0] }
+                            });
+                            sucesso++;
+                        } catch (e) {
+                            console.error('Erro ao importar linha:', linha, e);
+                            ignoradas++;
+                        }
+                    }
+
+                    if (sucesso > 0) await registrarLog('importacao', '-', 'Importação em massa', `${sucesso} insumo(s) importado(s), ${ignoradas} ignorada(s)`);
+                    mostrarToast(`${sucesso} insumo(s) importado(s) com sucesso!`, 'sucesso');
+                    if (ignoradas > 0) mostrarToast(`${ignoradas} linha(s) ignorada(s) (sem nome ou com erro).`, 'info');
+                } catch (erro) {
+                    console.error('Erro ao importar arquivo:', erro);
+                    mostrarToast('Erro ao ler o arquivo. Confira se o formato é .xlsx ou .csv.', 'erro');
+                } finally {
+                    importando.value = false;
+                    evento.target.value = '';
+                }
+            };
+
             const insumoEditando = ref(null);
             const formEdicao = ref(null);
 
@@ -957,7 +1271,7 @@
                 formEdicao.value = {
                     nome: insumo.nome, categoria: insumo.categoria || '', unidade: insumo.unidade,
                     estoqueMinimoDias: insumo.estoqueMinimoDias || 5, custoUnitario: insumo.custoUnitario || 0,
-                    codigoBarra: insumo.codigoBarra || '',
+                    codigoBarra: insumo.codigoBarra || '', unidadeFabril: insumo.unidadeFabril || 'Fábrica 1',
                     fornecedorNome: (insumo.fornecedor && insumo.fornecedor.nome) || '',
                     fornecedorContato: (insumo.fornecedor && insumo.fornecedor.contato) || ''
                 };
@@ -972,6 +1286,7 @@
                         estoqueMinimoDias: formEdicao.value.estoqueMinimoDias || 5,
                         custoUnitario: formEdicao.value.custoUnitario || 0,
                         codigoBarra: formEdicao.value.codigoBarra || '',
+                        unidadeFabril: formEdicao.value.unidadeFabril || 'Fábrica 1',
                         fornecedor: { nome: formEdicao.value.fornecedorNome || '', contato: formEdicao.value.fornecedorContato || '' }
                     });
                     await registrarLog('edicao', insumoEditando.value.id, formEdicao.value.nome, 'Dados do insumo atualizados');
@@ -1205,10 +1520,11 @@
 
             // ---------- Exportação ----------
             const exportarExcel = () => {
-                const linhas = insumos.value.map(i => ({
+                const linhas = insumosDaUnidade.value.map(i => ({
                     Nome: i.nome,
                     Categoria: i.categoria || '',
                     Unidade: i.unidade,
+                    'Unidade Fabril': i.unidadeFabril || 'Fábrica 1',
                     'Estoque Atual': i.estoqueAtual,
                     'Dias Restantes': i.diasRestantes !== null && i.diasRestantes !== undefined ? Number(i.diasRestantes.toFixed(1)) : '',
                     'Custo Unitário': i.custoUnitario || 0,
@@ -1226,7 +1542,7 @@
                 const doc = new jsPDF();
                 doc.setFontSize(14);
                 doc.text('Relatório de Insumos - Fábrica 2', 14, 15);
-                const linhas = insumos.value.map(i => [
+                const linhas = insumosDaUnidade.value.map(i => [
                     i.nome, i.categoria || '-', `${i.estoqueAtual} ${i.unidade}`,
                     i.diasRestantes !== null && i.diasRestantes !== undefined ? i.diasRestantes.toFixed(1) : '-',
                     `R$ ${(i.custoUnitario || 0).toFixed(2)}`,
@@ -1268,7 +1584,10 @@
                 podeCadastrarProduto, podeEditarExcluir, podeVerLogs, podeCadastrarPessoa,
                 abaAtiva, menuAberto, irPara, insumos, insumosFiltrados, carregando, erroConexao,
                 categorias, filtroCategoria, alertasCriticos,
+                unidadeFabrilSelecionada, unidadesFabris, insumosDaUnidade,
+                buscaTexto, ordenacao, kpis, custoPorCategoria,
                 form, salvarInsumo, salvarAuditoria, obterCorStatus,
+                importando, baixarModeloImportacao, importarArquivo,
                 insumoEditando, formEdicao, abrirEdicao, salvarEdicao, excluirInsumo,
                 logs, usuarios, convites, formConvite, dominioEmail, atualizarEmailGerado, pessoasCombinadas, enviarConvite, alterarNivelPessoa, excluirConvite,
                 alertas, alertasNaoLidos, alertasOrdenados, tiposAlerta: TIPOS_ALERTA, marcarAlertaComoLido, marcarTodosComoLidos,
@@ -1279,6 +1598,7 @@
     });
 
     app.component('chart-consumo', ChartConsumo);
+    app.component('grafico-categorias', GraficoCategorias);
     app.mount('#app');
 
     if ('serviceWorker' in navigator) {
