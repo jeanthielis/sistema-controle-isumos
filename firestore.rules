@@ -1,0 +1,100 @@
+rules_version = '2';
+
+// Regras de segurança do Firestore para o app "Fábrica 2".
+// Cole isto em: Console do Firebase > Firestore Database > Regras.
+//
+// Níveis de acesso (campo "role" em usuarios/{uid} e "nivelAcesso" em convites/{email}):
+//   - administrador: acesso total.
+//   - supervisor: dashboard, auditoria, logs, cadastro de pessoas (nível inspetor),
+//                 cadastrar/editar/excluir insumos.
+//   - inspetor: apenas dashboard e auditoria.
+//
+// Fluxo de cadastro de pessoas:
+//   1. Um administrador ou supervisor cria um documento em "convites/{email}"
+//      com o nível de acesso desejado (supervisor só pode convidar como "inspetor").
+//   2. Quando essa pessoa se cadastra de verdade (Authentication e-mail/senha),
+//      o app lê o convite e cria "usuarios/{uid}" com esse nível — e a regra abaixo
+//      confirma que o nível reivindicado bate com o nível definido no convite.
+//   3. O primeiro administrador do sistema precisa ser promovido manualmente:
+//      registre-se pelo app (entra como inspetor) e troque o campo "role" para
+//      "administrador" direto na coleção "usuarios" pelo Console do Firebase.
+
+function autenticado() {
+  return request.auth != null;
+}
+
+function meuUsuario() {
+  return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+}
+
+function souAdmin() {
+  return autenticado() &&
+    exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+    meuUsuario().role == 'administrador';
+}
+
+function souSupervisor() {
+  return autenticado() &&
+    exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+    meuUsuario().role == 'supervisor';
+}
+
+function souAdminOuSupervisor() {
+  return souAdmin() || souSupervisor();
+}
+
+// Campos que qualquer usuário autenticado pode alterar via tela de Auditoria.
+function camposDeAuditoria() {
+  return request.resource.data.diff(resource.data).affectedKeys()
+    .hasOnly(['estoqueAtual', 'dataUltimaAuditoria', 'consumoDiarioCalculado', 'diasRestantes', 'historico', 'custoAcumulado']);
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /insumos/{insumoId} {
+      allow read: if autenticado();
+      allow create, delete: if souAdminOuSupervisor();
+      allow update: if souAdminOuSupervisor() || (autenticado() && camposDeAuditoria());
+    }
+
+    match /usuarios/{userId} {
+      allow read: if autenticado();
+
+      // Uma pessoa só cria o PRÓPRIO documento, e o nível de acesso reivindicado
+      // precisa ser 'inspetor' (padrão) OU exatamente o nível definido num convite
+      // pendente com o mesmo e-mail.
+      allow create: if autenticado() && request.auth.uid == userId &&
+        (
+          request.resource.data.role == 'inspetor' ||
+          (
+            exists(/databases/$(database)/documents/convites/$(request.auth.token.email.lower())) &&
+            get(/databases/$(database)/documents/convites/$(request.auth.token.email.lower())).data.nivelAcesso == request.resource.data.role
+          )
+        );
+
+      allow update: if souAdmin();
+      allow delete: if souAdmin();
+    }
+
+    match /convites/{email} {
+      allow read: if autenticado();
+
+      // Admin pode convidar com qualquer nível; supervisor só pode convidar como inspetor.
+      allow create: if souAdmin() ||
+        (souSupervisor() && request.resource.data.nivelAcesso == 'inspetor');
+
+      // Marcar como usado (pela própria pessoa recém-cadastrada) ou alterar nível (admin).
+      allow update: if souAdmin() ||
+        (autenticado() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usado']));
+
+      allow delete: if souAdmin();
+    }
+
+    match /logs/{logId} {
+      allow create: if autenticado();
+      allow read: if souAdminOuSupervisor();
+      allow update, delete: if false;
+    }
+  }
+}

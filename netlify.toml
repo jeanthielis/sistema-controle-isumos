@@ -1,0 +1,13 @@
+[build]
+  publish = "."
+
+# Garante que rotas do app (SPA) sempre carreguem o index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
