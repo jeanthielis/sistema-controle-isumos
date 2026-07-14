@@ -366,6 +366,14 @@
                 <button @click="exportarPDF" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-red-700">
                     <i class="fa-solid fa-file-pdf mr-2"></i> Exportar PDF
                 </button>
+
+                <div class="mt-6 pt-4 border-t border-gray-200">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase mb-2">Manutenção</h3>
+                    <button @click="normalizarCategoriasExistentes" class="w-full bg-gray-100 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-200 border border-gray-200">
+                        <i class="fa-solid fa-broom mr-2"></i> Padronizar categorias existentes
+                    </button>
+                    <p class="text-[10px] text-gray-400 mt-1">Reescreve a categoria de todos os insumos no formato padrão (ex: "LIMPEZA" e "limpeza" viram "Limpeza"). Ação em lote, uma vez só.</p>
+                </div>
             </div>
 
             <!-- ---------- LOGS (admin + supervisor) ---------- -->
@@ -770,14 +778,32 @@
             });
 
             // ---------- Derivados ----------
+            // Normaliza categoria para agrupar variações como "LIMPEZA", "limpeza", "  Limpeza  "
+            // todas sob um único rótulo padronizado ("Limpeza").
+            const normalizarCategoria = (texto) => {
+                return (texto || '')
+                    .trim()
+                    .replace(/\s+/g, ' ')
+                    .toLowerCase()
+                    .split(' ')
+                    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+                    .join(' ');
+            };
+
             const categorias = computed(() => {
-                const set = new Set(insumos.value.map(i => i.categoria).filter(Boolean));
-                return Array.from(set);
+                const mapa = new Map(); // chave normalizada (lowercase) -> rótulo padronizado para exibir
+                insumos.value.forEach(i => {
+                    if (!i.categoria) return;
+                    const chave = i.categoria.trim().toLowerCase();
+                    if (chave && !mapa.has(chave)) mapa.set(chave, normalizarCategoria(i.categoria));
+                });
+                return Array.from(mapa.values()).sort();
             });
 
             const insumosFiltrados = computed(() => {
                 if (!filtroCategoria.value) return insumos.value;
-                return insumos.value.filter(i => i.categoria === filtroCategoria.value);
+                const alvo = filtroCategoria.value.trim().toLowerCase();
+                return insumos.value.filter(i => (i.categoria || '').trim().toLowerCase() === alvo);
             });
 
             const alertasCriticos = computed(() =>
@@ -900,7 +926,7 @@
                 try {
                     const ref = await db.collection(COL_INSUMOS).add({
                         nome: form.value.nome,
-                        categoria: form.value.categoria || '',
+                        categoria: normalizarCategoria(form.value.categoria) || '',
                         unidade: form.value.unidade,
                         estoqueAtual: form.value.estoqueAtual || 0,
                         estoqueMinimoDias: form.value.estoqueMinimoDias || 5,
@@ -941,7 +967,7 @@
                 try {
                     await db.collection(COL_INSUMOS).doc(insumoEditando.value.id).update({
                         nome: formEdicao.value.nome,
-                        categoria: formEdicao.value.categoria || '',
+                        categoria: normalizarCategoria(formEdicao.value.categoria) || '',
                         unidade: formEdicao.value.unidade,
                         estoqueMinimoDias: formEdicao.value.estoqueMinimoDias || 5,
                         custoUnitario: formEdicao.value.custoUnitario || 0,
@@ -1216,6 +1242,26 @@
                 doc.save(`relatorio-insumos-${Date.now()}.pdf`);
             };
 
+            // ---------- Manutenção: padronizar categorias já cadastradas ----------
+            const normalizarCategoriasExistentes = async () => {
+                const paraAtualizar = insumos.value.filter(i => i.categoria && i.categoria !== normalizarCategoria(i.categoria));
+                if (paraAtualizar.length === 0) {
+                    mostrarToast('Todas as categorias já estão padronizadas!', 'info');
+                    return;
+                }
+                if (!confirm(`Isso vai padronizar a categoria de ${paraAtualizar.length} insumo(s). Continuar?`)) return;
+                try {
+                    await Promise.all(paraAtualizar.map(i =>
+                        db.collection(COL_INSUMOS).doc(i.id).update({ categoria: normalizarCategoria(i.categoria) })
+                    ));
+                    await registrarLog('manutencao', '-', 'Categorias', `${paraAtualizar.length} insumo(s) com categoria padronizada`);
+                    mostrarToast(`${paraAtualizar.length} insumo(s) com categoria padronizada!`, 'sucesso');
+                } catch (erro) {
+                    console.error('Erro ao padronizar categorias:', erro);
+                    mostrarToast('Erro ao padronizar categorias. Veja o console para detalhes.', 'erro');
+                }
+            };
+
             return {
                 toasts, removerToast,
                 usuarioAtual, perfil, souAdmin, souSupervisor, souInspetor, modoRegistro, authForm, authErro, entrar, registrar, sair,
@@ -1227,7 +1273,7 @@
                 logs, usuarios, convites, formConvite, dominioEmail, atualizarEmailGerado, pessoasCombinadas, enviarConvite, alterarNivelPessoa, excluirConvite,
                 alertas, alertasNaoLidos, alertasOrdenados, tiposAlerta: TIPOS_ALERTA, marcarAlertaComoLido, marcarTodosComoLidos,
                 scannerAberto, abrirScanner, fecharScanner,
-                exportarExcel, exportarPDF
+                exportarExcel, exportarPDF, normalizarCategoriasExistentes
             };
         }
     });
