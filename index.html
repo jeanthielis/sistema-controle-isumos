@@ -289,6 +289,11 @@
                     </div>
                 </div>
 
+                <div v-if="Object.keys(custoPorCategoria).length > 0" class="bg-white border border-slate-200 rounded-xl p-4 mb-6 shadow-sm">
+                    <p class="text-xs font-bold text-slate-500 uppercase mb-2">Custo Acumulado por Categoria</p>
+                    <grafico-categorias :dados="custoPorCategoria"></grafico-categorias>
+                </div>
+
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 mb-6">
                     <div class="relative flex-1">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -462,7 +467,283 @@
                 </div>
             </div>
 
+            <!-- ---------- CENTRAL DE ALERTAS ---------- -->
+            <div v-if="abaAtiva === 'alertas'" class="animate-fade-in max-w-4xl mx-auto">
+                <div class="flex justify-between items-center mb-1">
+                    <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Central de Alertas</h2>
+                    <button v-if="alertasNaoLidos.length > 0" @click="marcarTodosComoLidos" class="text-xs text-industrial-blue font-bold underline">Marcar tudo como lido</button>
+                </div>
+                <p class="text-sm text-slate-500 font-medium mb-6">Estoque zerado, estoque crítico e insumos sem auditoria recente.</p>
+
+                <div v-if="alertas.length === 0" class="text-center text-slate-400 mt-10">
+                    <i class="fa-solid fa-bell-slash text-4xl mb-3"></i>
+                    <p>Nenhum alerta no momento.</p>
+                </div>
+
+                <div v-for="alerta in alertasOrdenados" :key="alerta.id"
+                     class="bg-white border rounded-xl p-4 mb-3 flex items-start gap-3 shadow-sm"
+                     :class="alerta.lido ? 'border-slate-200 opacity-60' : 'border-red-200'">
+                    <i class="fa-solid text-lg mt-0.5"
+                       :class="[tiposAlerta[alerta.tipo] ? tiposAlerta[alerta.tipo].icone : 'fa-bell', alerta.resolvido ? 'text-slate-400' : 'text-red-500']"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-slate-800 truncate">{{ alerta.insumoNome }}</p>
+                        <p class="text-xs text-slate-600">{{ alerta.mensagem }}</p>
+                        <p class="text-[10px] text-slate-400 mt-1">
+                            {{ new Date(alerta.criadoEm).toLocaleString('pt-BR') }}
+                            <span v-if="alerta.resolvido" class="text-emerald-600 font-bold"> · Resolvido</span>
+                        </p>
+                    </div>
+                    <button v-if="!alerta.lido" @click="marcarAlertaComoLido(alerta)" class="text-[10px] text-industrial-blue font-bold border border-blue-200 rounded px-2 py-1 whitespace-nowrap">
+                        Marcar lido
+                    </button>
+                </div>
+            </div>
+
+            <!-- ---------- RELATÓRIOS (admin) ---------- -->
+            <div v-if="abaAtiva === 'relatorios' && souAdmin" class="animate-fade-in max-w-2xl mx-auto">
+                <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Relatórios</h2>
+                <p class="text-sm text-slate-500 font-medium mb-6">Exporta todos os insumos com estoque, dias restantes e custos.</p>
+                <button @click="exportarExcel" class="w-full btn-primario py-3.5 rounded-xl mb-3 shadow-md">
+                    <i class="fa-solid fa-file-excel mr-2"></i> Exportar Excel
+                </button>
+                <button @click="exportarPDF" class="w-full bg-industrial-dark hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
+                    <i class="fa-solid fa-file-pdf mr-2"></i> Exportar PDF
+                </button>
+
+                <div class="mt-8 pt-6 border-t border-slate-200">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase mb-2">Manutenção</h3>
+                    <button @click="normalizarCategoriasExistentes" class="w-full btn-secundario py-3 rounded-xl">
+                        <i class="fa-solid fa-broom mr-2"></i> Padronizar categorias existentes
+                    </button>
+                </div>
+            </div>
+
+            <!-- ---------- LOGS (admin + supervisor) ---------- -->
+            <div v-if="abaAtiva === 'logs' && podeVerLogs" class="animate-fade-in max-w-2xl mx-auto">
+                <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Histórico de Alterações</h2>
+                <p class="text-sm text-slate-500 font-medium mb-6">Registro de cadastros, edições e auditorias.</p>
+                <div v-if="logs.length === 0" class="text-center text-slate-400 mt-10">
+                    <i class="fa-solid fa-inbox text-4xl mb-3"></i>
+                    <p>Nenhum registro ainda.</p>
+                </div>
+                <div v-for="log in logs" :key="log.id" class="bg-white border border-slate-200 rounded-xl p-3 mb-2 text-sm shadow-sm">
+                    <div class="flex justify-between">
+                        <span class="font-bold text-industrial-blue">{{ log.tipo }}</span>
+                        <span class="text-[10px] text-slate-400">{{ new Date(log.timestamp).toLocaleString('pt-BR') }}</span>
+                    </div>
+                    <p class="text-slate-700">{{ log.insumoNome }} — {{ log.detalhes }}</p>
+                    <p class="text-[10px] text-slate-400">{{ log.usuarioEmail }}</p>
+                </div>
+            </div>
+
+            <!-- ---------- PESSOAS / NÍVEIS DE ACESSO (admin + supervisor) ---------- -->
+            <div v-if="abaAtiva === 'pessoas' && podeCadastrarPessoa" class="animate-fade-in max-w-2xl mx-auto">
+                <div class="flex justify-between items-start mb-1 gap-3">
+                    <div>
+                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">{{ souAdmin ? 'Níveis de Acesso' : 'Cadastro de Pessoas' }}</h2>
+                        <p class="text-sm text-slate-500 font-medium">{{ souAdmin ? 'Cadastre pessoas e vincule o nível de acesso de cada uma.' : 'Cadastre uma nova pessoa. Ela entra como Inspetor.' }}</p>
+                    </div>
+                    <button @click="mostrarModalPessoa = true" class="btn-primario px-4 py-2.5 rounded-xl text-sm whitespace-nowrap shrink-0">
+                        <i class="fa-solid fa-user-plus mr-1"></i> Nova Pessoa
+                    </button>
+                </div>
+
+                <div v-if="souAdmin" class="mt-5">
+                    <h3 class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Pessoas cadastradas</h3>
+                    <div v-if="pessoasCombinadas.length === 0" class="text-center text-slate-400 mt-6 text-sm">Nenhuma pessoa cadastrada ainda.</div>
+                    <div v-for="p in pessoasCombinadas" :key="p.status + '-' + p.id" class="bg-white border border-slate-200 rounded-xl p-3 mb-2 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <div class="mr-2 min-w-0">
+                                <p class="text-sm font-bold text-slate-800 truncate">{{ p.nome || p.email }}</p>
+                                <p class="text-[10px] text-slate-400 truncate">{{ p.email }}</p>
+                            </div>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+                                  :class="p.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'">
+                                {{ p.status === 'ativo' ? 'Ativo' : 'Convidado' }}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <select :value="p.nivelAcesso" @change="alterarNivelPessoa(p, $event.target.value)" class="text-xs input-industrial p-1.5 flex-1">
+                                <option value="administrador">Administrador</option>
+                                <option value="supervisor">Supervisor</option>
+                                <option value="inspetor">Inspetor</option>
+                            </select>
+                            <button v-if="p.status === 'convidado'" @click="excluirConvite(p)" class="text-red-500 text-xs px-2 py-1.5 border border-red-200 rounded-lg">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center text-slate-400 mt-14">
+                    <i class="fa-solid fa-user-plus text-4xl mb-3"></i>
+                    <p class="text-sm">Clique em "Nova Pessoa" para cadastrar alguém.</p>
+                </div>
+            </div>
+
             </main>
+
+        <!-- ---------- MODAL: NOVO INSUMO ---------- -->
+        <div v-if="mostrarModalCadastro" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
+            <div class="bg-white w-full max-w-lg mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-extrabold text-slate-900">Novo Insumo</h3>
+                    <button @click="mostrarModalCadastro = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="salvarInsumo" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Nome do Insumo *</label>
+                        <input v-model="form.nome" type="text" required class="input-industrial">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Categoria</label>
+                            <input v-model="form.categoria" type="text" placeholder="Ex: Matéria-prima" class="input-industrial">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Unidade de Medida *</label>
+                            <select v-model="form.unidade" class="input-industrial">
+                                <option value="kg">Quilogramas (kg)</option>
+                                <option value="litros">Litros (L)</option>
+                                <option value="unidades">Unidades (un)</option>
+                                <option value="ton">Toneladas (ton)</option>
+                                <option value="metros">Metros (m)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Estoque Inicial</label>
+                            <input v-model.number="form.estoqueAtual" type="number" step="0.01" min="0" class="input-industrial font-num">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Alerta (dias)</label>
+                            <input v-model.number="form.estoqueMinimoDias" type="number" step="1" min="0" class="input-industrial font-num">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Custo Unitário (R$)</label>
+                        <input v-model.number="form.custoUnitario" type="number" step="0.01" min="0" class="input-industrial font-num">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Código de Barras / QR (opcional)</label>
+                        <input v-model="form.codigoBarra" type="text" class="input-industrial">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Fornecedor</label>
+                            <input v-model="form.fornecedorNome" type="text" class="input-industrial">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Contato</label>
+                            <input v-model="form.fornecedorContato" type="text" class="input-industrial">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Unidade Fabril</label>
+                        <input v-model="form.unidadeFabril" type="text" list="lista-unidades-fabris" placeholder="Ex: Fábrica 1" class="input-industrial">
+                        <datalist id="lista-unidades-fabris">
+                            <option v-for="u in unidadesFabris" :key="u" :value="u"></option>
+                        </datalist>
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" @click="mostrarModalCadastro = false" class="flex-1 btn-secundario py-3 rounded-xl">Cancelar</button>
+                        <button type="submit" class="flex-1 btn-primario py-3 rounded-xl">
+                            <i class="fa-solid fa-check mr-2"></i> Cadastrar
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-6 pt-5 border-t border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-1"><i class="fa-solid fa-file-arrow-up mr-1 text-industrial-blue"></i> Importar em massa</h3>
+                    <p class="text-xs text-slate-500 mb-3">Cadastre vários insumos de uma vez a partir de uma planilha Excel ou CSV.</p>
+                    <button @click="baixarModeloImportacao" type="button" class="w-full btn-secundario py-2.5 rounded-xl mb-2 text-sm">
+                        <i class="fa-solid fa-download mr-2"></i> Baixar planilha modelo
+                    </button>
+                    <label class="w-full flex items-center justify-center gap-2 btn-primario py-2.5 rounded-xl cursor-pointer text-sm">
+                        <i class="fa-solid" :class="importando ? 'fa-spinner fa-spin' : 'fa-file-import'"></i>
+                        {{ importando ? 'Importando...' : 'Selecionar arquivo (.xlsx, .csv)' }}
+                        <input type="file" accept=".xlsx,.xls,.csv" class="hidden" :disabled="importando" @change="importarArquivo">
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ---------- MODAL: NOVA PESSOA ---------- -->
+        <div v-if="mostrarModalPessoa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
+            <div class="bg-white w-full max-w-md mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-extrabold text-slate-900">Nova Pessoa</h3>
+                    <button @click="mostrarModalPessoa = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="enviarConvite" class="space-y-4">
+                    <input v-model="formConvite.nome" @input="atualizarEmailGerado" type="text" placeholder="Nome completo" required class="input-industrial">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">E-mail de acesso (gerado automaticamente)</label>
+                        <div class="flex gap-2">
+                            <input v-model="formConvite.email" :readonly="!formConvite.emailEditadoManualmente" type="email" required
+                                   :class="formConvite.emailEditadoManualmente ? 'bg-white' : 'bg-slate-50 text-slate-500'"
+                                   class="flex-1 input-industrial">
+                            <button type="button" @click="formConvite.emailEditadoManualmente = !formConvite.emailEditadoManualmente"
+                                    class="px-3 btn-secundario rounded-lg">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1">Padrão: primeironome.segundonome@{{ dominioEmail }} — clique no lápis para editar.</p>
+                    </div>
+                    <select v-if="souAdmin" v-model="formConvite.nivelAcesso" class="input-industrial">
+                        <option value="administrador">Administrador</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="inspetor">Inspetor</option>
+                    </select>
+                    <p v-else class="text-xs text-slate-400">Nível de acesso: Inspetor (padrão)</p>
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" @click="mostrarModalPessoa = false" class="flex-1 btn-secundario py-3 rounded-xl">Cancelar</button>
+                        <button type="submit" class="flex-1 btn-primario py-3 rounded-xl">
+                            <i class="fa-solid fa-user-plus mr-2"></i> Cadastrar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ---------- MODAL DE EDIÇÃO ---------- -->
+        <div v-if="insumoEditando" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
+            <div class="bg-white w-full max-w-md mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
+                <h3 class="text-lg font-extrabold text-slate-900 mb-4">Editar Insumo</h3>
+                <form @submit.prevent="salvarEdicao" class="space-y-3">
+                    <input v-model="formEdicao.nome" type="text" required placeholder="Nome" class="input-industrial">
+                    <input v-model="formEdicao.categoria" type="text" placeholder="Categoria" class="input-industrial">
+                    <select v-model="formEdicao.unidade" class="input-industrial">
+                        <option value="kg">Quilogramas (kg)</option>
+                        <option value="litros">Litros (L)</option>
+                        <option value="unidades">Unidades (un)</option>
+                        <option value="ton">Toneladas (ton)</option>
+                        <option value="metros">Metros (m)</option>
+                    </select>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input v-model.number="formEdicao.estoqueMinimoDias" type="number" placeholder="Alerta (dias)" class="input-industrial">
+                        <input v-model.number="formEdicao.custoUnitario" type="number" step="0.01" placeholder="Custo unitário" class="input-industrial">
+                    </div>
+                    <input v-model="formEdicao.codigoBarra" type="text" placeholder="Código de barras / QR" class="input-industrial">
+                    <input v-model="formEdicao.unidadeFabril" type="text" list="lista-unidades-fabris-edicao" placeholder="Unidade Fabril" class="input-industrial">
+                    <datalist id="lista-unidades-fabris-edicao">
+                        <option v-for="u in unidadesFabris" :key="u" :value="u"></option>
+                    </datalist>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input v-model="formEdicao.fornecedorNome" type="text" placeholder="Fornecedor" class="input-industrial">
+                        <input v-model="formEdicao.fornecedorContato" type="text" placeholder="Contato" class="input-industrial">
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" @click="insumoEditando = null" class="flex-1 btn-secundario py-3 rounded-xl">Cancelar</button>
+                        <button type="submit" class="flex-1 btn-primario py-3 rounded-xl">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <nav class="md:hidden absolute bottom-0 w-full bg-white border-t border-slate-200 flex justify-around items-center h-16 shadow-[0_-4px_15px_rgba(0,0,0,0.03)] z-40 pb-safe">
             <button @click="irPara('dashboard')" :class="{'text-industrial-orange': abaAtiva === 'dashboard', 'text-slate-400': abaAtiva !== 'dashboard'}" class="flex flex-col items-center w-1/3 py-2 transition-colors">
