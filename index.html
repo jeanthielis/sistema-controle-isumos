@@ -45,11 +45,37 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .destaque-scan { animation: piscar 1.2s ease-in-out 2; }
         @keyframes piscar { 0%,100% { background-color: #fff; } 50% { background-color: #DBEAFE; } }
+        .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
+        .toast-enter-from { opacity: 0; transform: translateY(-12px); }
+        .toast-leave-to { opacity: 0; transform: translateX(20px); }
     </style>
 </head>
 <body class="flex justify-center h-screen overflow-hidden">
 
 <div id="app" class="w-full max-w-md bg-white h-full flex flex-col relative shadow-2xl">
+
+    <!-- ===================== TOASTS (notificações) ===================== -->
+    <div class="absolute top-4 inset-x-4 z-50 flex flex-col gap-2 pointer-events-none">
+        <transition-group name="toast">
+            <div v-for="toast in toasts" :key="toast.id"
+                 class="pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-bold text-white"
+                 :class="{
+                    'bg-verdeclaro text-green-900': toast.tipo === 'sucesso',
+                    'bg-red-500': toast.tipo === 'erro',
+                    'bg-egipcio': toast.tipo === 'info'
+                 }">
+                <i class="fa-solid" :class="{
+                    'fa-circle-check': toast.tipo === 'sucesso',
+                    'fa-circle-exclamation': toast.tipo === 'erro',
+                    'fa-circle-info': toast.tipo === 'info'
+                }"></i>
+                <span class="flex-1">{{ toast.mensagem }}</span>
+                <button @click="removerToast(toast.id)" class="opacity-70 hover:opacity-100">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </transition-group>
+    </div>
 
     <!-- ===================== TELA DE LOGIN ===================== -->
     <div v-if="!usuarioAtual" class="flex-1 flex flex-col justify-center items-center p-6 bg-fundo">
@@ -84,12 +110,22 @@
             <h1 class="text-xl font-bold tracking-wide"><i class="fa-solid fa-industry mr-2"></i> Fábrica 2</h1>
             <div class="flex items-center gap-2">
                 <span class="text-[10px] bg-white text-egipcio px-2 py-1 rounded-full font-bold uppercase">{{ perfil || '...' }}</span>
+                <button @click="irPara('alertas')" class="relative text-white text-lg px-1">
+                    <i class="fa-solid fa-bell"></i>
+                    <span v-if="alertasNaoLidos.length > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                        {{ alertasNaoLidos.length > 9 ? '9+' : alertasNaoLidos.length }}
+                    </span>
+                </button>
                 <button @click="menuAberto = !menuAberto" class="text-white text-lg px-1">
                     <i class="fa-solid fa-bars"></i>
                 </button>
             </div>
 
             <div v-if="menuAberto" class="absolute right-2 top-14 bg-white text-gray-800 rounded-lg shadow-xl w-52 z-30 overflow-hidden border border-gray-100">
+                <button @click="irPara('alertas')" class="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2">
+                    <i class="fa-solid fa-bell text-egipcio"></i> Central de Alertas
+                    <span v-if="alertasNaoLidos.length > 0" class="ml-auto bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{{ alertasNaoLidos.length > 9 ? '9+' : alertasNaoLidos.length }}</span>
+                </button>
                 <button v-if="souAdmin" @click="irPara('relatorios')" class="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2">
                     <i class="fa-solid fa-file-export text-egipcio"></i> Relatórios
                 </button>
@@ -285,6 +321,38 @@
                         <div id="leitor-codigo" class="w-full"></div>
                         <button @click="fecharScanner" class="w-full mt-3 bg-gray-100 text-gray-600 font-bold py-2 rounded-lg">Cancelar</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- ---------- CENTRAL DE ALERTAS ---------- -->
+            <div v-if="abaAtiva === 'alertas'" class="animate-fade-in">
+                <div class="flex justify-between items-center mb-1">
+                    <h2 class="text-xl font-bold text-egipcio">Central de Alertas</h2>
+                    <button v-if="alertasNaoLidos.length > 0" @click="marcarTodosComoLidos" class="text-xs text-egipcio font-bold underline">Marcar tudo como lido</button>
+                </div>
+                <p class="text-sm text-gray-500 mb-4 border-b-2 border-prata pb-2">Estoque zerado, estoque crítico e insumos sem auditoria recente.</p>
+
+                <div v-if="alertas.length === 0" class="text-center text-gray-400 mt-10">
+                    <i class="fa-solid fa-bell-slash text-4xl mb-3"></i>
+                    <p>Nenhum alerta no momento.</p>
+                </div>
+
+                <div v-for="alerta in alertasOrdenados" :key="alerta.id"
+                     class="bg-white border rounded-lg p-3 mb-2 flex items-start gap-3"
+                     :class="alerta.lido ? 'border-gray-200 opacity-60' : 'border-red-200'">
+                    <i class="fa-solid text-lg mt-0.5"
+                       :class="[tiposAlerta[alerta.tipo] ? tiposAlerta[alerta.tipo].icone : 'fa-bell', alerta.resolvido ? 'text-gray-400' : 'text-red-500']"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-800 truncate">{{ alerta.insumoNome }}</p>
+                        <p class="text-xs text-gray-600">{{ alerta.mensagem }}</p>
+                        <p class="text-[10px] text-gray-400 mt-1">
+                            {{ new Date(alerta.criadoEm).toLocaleString('pt-BR') }}
+                            <span v-if="alerta.resolvido" class="text-green-600 font-bold"> · Resolvido</span>
+                        </p>
+                    </div>
+                    <button v-if="!alerta.lido" @click="marcarAlertaComoLido(alerta)" class="text-[10px] text-egipcio font-bold border border-blue-200 rounded px-2 py-1 whitespace-nowrap">
+                        Marcar lido
+                    </button>
                 </div>
             </div>
 
@@ -517,10 +585,29 @@
     const COL_USUARIOS = 'usuarios';
     const COL_LOGS = 'logs';
     const COL_CONVITES = 'convites';
+    const COL_ALERTAS = 'alertas';
     const DOMINIO_EMAIL = 'insumo.com.br'; // domínio usado para gerar o e-mail de acesso automaticamente
+    const DIAS_SEM_AUDITORIA_ALERTA = 30; // dias sem contagem física para disparar alerta
+
+    const TIPOS_ALERTA = {
+        estoque_zerado: { label: 'Estoque zerado', icone: 'fa-ban' },
+        estoque_critico: { label: 'Estoque crítico', icone: 'fa-triangle-exclamation' },
+        sem_auditoria: { label: 'Sem auditoria recente', icone: 'fa-clock' }
+    };
 
     const app = createApp({
         setup() {
+            // ---------- Toasts (substituem os alert() nativos do navegador) ----------
+            const toasts = ref([]);
+            const mostrarToast = (mensagem, tipo = 'sucesso', duracao = 3500) => {
+                const id = Date.now() + Math.random();
+                toasts.value.push({ id, tipo, mensagem });
+                setTimeout(() => removerToast(id), duracao);
+            };
+            const removerToast = (id) => {
+                toasts.value = toasts.value.filter(t => t.id !== id);
+            };
+
             // ---------- Autenticação e níveis de acesso ----------
             // Três níveis: 'administrador' (tudo), 'supervisor' (operação + cadastro),
             // 'inspetor' (apenas dashboard e auditoria).
@@ -544,6 +631,7 @@
                 authErro.value = null;
                 try {
                     await auth.signInWithEmailAndPassword(authForm.value.email, authForm.value.senha);
+                    mostrarToast('Acesso liberado!', 'sucesso');
                 } catch (e) {
                     authErro.value = 'Não foi possível entrar. Verifique e-mail e senha.';
                 }
@@ -576,6 +664,8 @@
                         role: nivelAcesso,
                         criadoEm: Date.now()
                     });
+                    mostrarToast('Login cadastrado com sucesso!', 'sucesso');
+                    mostrarToast('Acesso liberado!', 'sucesso');
                 } catch (e) {
                     authErro.value = 'Não foi possível cadastrar. O e-mail já pode estar em uso ou a senha é muito curta.';
                 }
@@ -609,6 +699,7 @@
             const logs = ref([]);
             const usuarios = ref([]);
             const convites = ref([]);
+            const alertas = ref([]);
             const dominioEmail = DOMINIO_EMAIL;
             const formConvite = ref({ nome: '', email: '', nivelAcesso: 'inspetor', emailEditadoManualmente: false });
 
@@ -625,7 +716,7 @@
             let unsubscribeLogs = null;
             let unsubscribeUsuarios = null;
             let unsubscribeConvites = null;
-            const idsNotificados = new Set();
+            let unsubscribeAlertas = null;
 
             onMounted(() => {
                 if ('Notification' in window && Notification.permission === 'default') {
@@ -640,7 +731,7 @@
                         });
                         carregando.value = false;
                         erroConexao.value = null;
-                        verificarAlertas();
+                        sincronizarAlertas();
                     },
                     (erro) => {
                         console.error('Erro ao conectar ao Firestore:', erro);
@@ -663,6 +754,11 @@
                     (snapshot) => { convites.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); },
                     (erro) => console.error('Erro ao ler convites:', erro)
                 );
+
+                unsubscribeAlertas = db.collection(COL_ALERTAS).orderBy('criadoEm', 'desc').onSnapshot(
+                    (snapshot) => { alertas.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); },
+                    (erro) => console.error('Erro ao ler alertas:', erro)
+                );
             });
 
             onUnmounted(() => {
@@ -670,6 +766,7 @@
                 if (unsubscribeLogs) unsubscribeLogs();
                 if (unsubscribeUsuarios) unsubscribeUsuarios();
                 if (unsubscribeConvites) unsubscribeConvites();
+                if (unsubscribeAlertas) unsubscribeAlertas();
             });
 
             // ---------- Derivados ----------
@@ -687,18 +784,102 @@
                 insumos.value.filter(i => i.diasRestantes !== null && i.diasRestantes !== undefined && i.diasRestantes <= (i.estoqueMinimoDias || 5))
             );
 
-            const verificarAlertas = () => {
-                insumos.value.forEach(i => {
-                    const critico = i.diasRestantes !== null && i.diasRestantes !== undefined && i.diasRestantes <= (i.estoqueMinimoDias || 5);
-                    if (critico) {
-                        if (!idsNotificados.has(i.id) && 'Notification' in window && Notification.permission === 'granted') {
-                            new Notification('Estoque baixo: ' + i.nome, { body: `Restam ${i.diasRestantes.toFixed(1)} dias de ${i.nome}` });
-                        }
-                        idsNotificados.add(i.id);
-                    } else {
-                        idsNotificados.delete(i.id);
+            // ---------- Sistema de Alertas (persistido no Firestore) ----------
+            // Gera automaticamente alertas de: estoque zerado, estoque crítico e
+            // insumo sem auditoria recente. Cada alerta tem um ID determinístico
+            // (insumoId + tipo), então nunca duplica mesmo com vários usuários
+            // conectados ao mesmo tempo.
+            const gerarMensagemAlerta = (tipo, insumo) => {
+                if (tipo === 'estoque_zerado') return `${insumo.nome} está com estoque zerado (0 ${insumo.unidade}).`;
+                if (tipo === 'estoque_critico') return `Previsão de acabar em ${insumo.diasRestantes.toFixed(1)} dias (limite: ${insumo.estoqueMinimoDias || 5} dias).`;
+                if (tipo === 'sem_auditoria') return `Sem contagem física há mais de ${DIAS_SEM_AUDITORIA_ALERTA} dias.`;
+                return `${insumo.nome}: alerta.`;
+            };
+
+            const dispararNotificacaoNavegador = (tipo, insumo) => {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(TIPOS_ALERTA[tipo].label + ': ' + insumo.nome, { body: gerarMensagemAlerta(tipo, insumo) });
+                }
+            };
+
+            const sincronizarAlertas = async () => {
+                const agora = Date.now();
+                for (const insumo of insumos.value) {
+                    const condicoesAtivas = new Set();
+
+                    if (insumo.estoqueAtual <= 0) {
+                        condicoesAtivas.add('estoque_zerado');
+                    } else if (insumo.diasRestantes !== null && insumo.diasRestantes !== undefined &&
+                               insumo.diasRestantes <= (insumo.estoqueMinimoDias || 5)) {
+                        condicoesAtivas.add('estoque_critico');
                     }
+
+                    const diasSemAuditoria = (agora - insumo.dataUltimaAuditoria) / (1000 * 60 * 60 * 24);
+                    if (diasSemAuditoria >= DIAS_SEM_AUDITORIA_ALERTA) {
+                        condicoesAtivas.add('sem_auditoria');
+                    }
+
+                    for (const tipo of Object.keys(TIPOS_ALERTA)) {
+                        const alertaId = `${insumo.id}_${tipo}`;
+                        const existente = alertas.value.find(a => a.id === alertaId);
+                        const ativo = condicoesAtivas.has(tipo);
+
+                        if (ativo && !existente) {
+                            try {
+                                await db.collection(COL_ALERTAS).doc(alertaId).set({
+                                    insumoId: insumo.id,
+                                    insumoNome: insumo.nome,
+                                    tipo,
+                                    mensagem: gerarMensagemAlerta(tipo, insumo),
+                                    criadoEm: agora,
+                                    lido: false,
+                                    resolvido: false
+                                });
+                                dispararNotificacaoNavegador(tipo, insumo);
+                            } catch (e) { console.error('Erro ao criar alerta:', e); }
+                        } else if (!ativo && existente && !existente.resolvido) {
+                            try {
+                                await db.collection(COL_ALERTAS).doc(alertaId).update({ resolvido: true, resolvidoEm: agora });
+                            } catch (e) { console.error('Erro ao resolver alerta:', e); }
+                        }
+                    }
+                }
+            };
+
+            const alertasNaoLidos = computed(() => alertas.value.filter(a => !a.lido));
+
+            const alertasOrdenados = computed(() => {
+                return [...alertas.value].sort((a, b) => {
+                    if (a.resolvido !== b.resolvido) return a.resolvido ? 1 : -1;
+                    if (a.lido !== b.lido) return a.lido ? 1 : -1;
+                    return b.criadoEm - a.criadoEm;
                 });
+            });
+
+            const marcarAlertaComoLido = async (alerta) => {
+                try {
+                    await db.collection(COL_ALERTAS).doc(alerta.id).update({
+                        lido: true,
+                        lidoPor: usuarioAtual.value ? usuarioAtual.value.email : '',
+                        lidoEm: Date.now()
+                    });
+                } catch (e) {
+                    console.error('Erro ao marcar alerta como lido:', e);
+                }
+            };
+
+            const marcarTodosComoLidos = async () => {
+                try {
+                    await Promise.all(alertasNaoLidos.value.map(a =>
+                        db.collection(COL_ALERTAS).doc(a.id).update({
+                            lido: true,
+                            lidoPor: usuarioAtual.value ? usuarioAtual.value.email : '',
+                            lidoEm: Date.now()
+                        })
+                    ));
+                } catch (e) {
+                    console.error('Erro ao marcar alertas como lidos:', e);
+                }
             };
 
             // ---------- Log de auditoria de alterações ----------
@@ -735,9 +916,10 @@
                     await registrarLog('criacao', ref.id, form.value.nome, 'Insumo cadastrado');
                     form.value = formDefault();
                     abaAtiva.value = 'dashboard';
+                    mostrarToast('Produto cadastrado com sucesso!', 'sucesso');
                 } catch (erro) {
                     console.error('Erro ao salvar insumo:', erro);
-                    alert('Erro ao salvar no Firebase. Veja o console para detalhes.');
+                    mostrarToast('Erro ao salvar no Firebase. Veja o console para detalhes.', 'erro');
                 }
             };
 
@@ -768,9 +950,10 @@
                     });
                     await registrarLog('edicao', insumoEditando.value.id, formEdicao.value.nome, 'Dados do insumo atualizados');
                     insumoEditando.value = null;
+                    mostrarToast('Insumo editado com sucesso!', 'sucesso');
                 } catch (erro) {
                     console.error('Erro ao editar insumo:', erro);
-                    alert('Erro ao editar no Firebase. Veja o console para detalhes.');
+                    mostrarToast('Erro ao editar no Firebase. Veja o console para detalhes.', 'erro');
                 }
             };
 
@@ -779,9 +962,10 @@
                 try {
                     await db.collection(COL_INSUMOS).doc(insumo.id).delete();
                     await registrarLog('exclusao', insumo.id, insumo.nome, 'Insumo excluído');
+                    mostrarToast('Insumo excluído com sucesso!', 'sucesso');
                 } catch (erro) {
                     console.error('Erro ao excluir insumo:', erro);
-                    alert('Erro ao excluir no Firebase. Veja o console para detalhes.');
+                    mostrarToast('Erro ao excluir no Firebase. Veja o console para detalhes.', 'erro');
                 }
             };
 
@@ -832,11 +1016,11 @@
                 if (atualizacoes.length > 0) {
                     try {
                         await Promise.all(atualizacoes);
-                        alert('Saldos atualizados!');
+                        mostrarToast('Saldos atualizados com sucesso!', 'sucesso');
                         abaAtiva.value = 'dashboard';
                     } catch (erro) {
                         console.error('Erro ao atualizar auditoria:', erro);
-                        alert('Erro ao atualizar no Firebase. Veja o console para detalhes.');
+                        mostrarToast('Erro ao atualizar no Firebase. Veja o console para detalhes.', 'erro');
                     }
                 }
             };
@@ -912,11 +1096,11 @@
                         criadoEm: Date.now()
                     });
                     await registrarLog('convite', emailLower, formConvite.value.nome || emailLower, `Pessoa cadastrada com nível ${nivel}`);
-                    alert(`Pessoa cadastrada! Ela terá acesso como "${nivel}" ao criar uma conta com o e-mail ${emailLower}.`);
+                    mostrarToast(`Pessoa cadastrada com sucesso! Nível: ${nivel}, e-mail: ${emailLower}`, 'sucesso', 5000);
                     formConvite.value = { nome: '', email: '', nivelAcesso: 'inspetor', emailEditadoManualmente: false };
                 } catch (erro) {
                     console.error('Erro ao cadastrar pessoa:', erro);
-                    alert('Erro ao cadastrar pessoa. Veja o console para detalhes.');
+                    mostrarToast('Erro ao cadastrar pessoa. Veja o console para detalhes.', 'erro');
                 }
             };
 
@@ -928,9 +1112,10 @@
                         await db.collection(COL_CONVITES).doc(pessoa.id).update({ nivelAcesso: novoNivel });
                     }
                     await registrarLog('nivel-acesso', pessoa.id, pessoa.nome || pessoa.email, `Nível de acesso alterado para ${novoNivel}`);
+                    mostrarToast('Nível de acesso atualizado com sucesso!', 'sucesso');
                 } catch (erro) {
                     console.error('Erro ao alterar nível de acesso:', erro);
-                    alert('Erro ao alterar nível de acesso. Veja o console para detalhes.');
+                    mostrarToast('Erro ao alterar nível de acesso. Veja o console para detalhes.', 'erro');
                 }
             };
 
@@ -938,9 +1123,10 @@
                 if (!confirm(`Cancelar o convite de "${pessoa.nome || pessoa.email}"?`)) return;
                 try {
                     await db.collection(COL_CONVITES).doc(pessoa.id).delete();
+                    mostrarToast('Convite cancelado.', 'info');
                 } catch (erro) {
                     console.error('Erro ao cancelar convite:', erro);
-                    alert('Erro ao cancelar convite. Veja o console para detalhes.');
+                    mostrarToast('Erro ao cancelar convite. Veja o console para detalhes.', 'erro');
                 }
             };
 
@@ -961,7 +1147,7 @@
                         },
                         () => {}
                     ).catch((erro) => {
-                        alert('Não foi possível acessar a câmera: ' + erro);
+                        mostrarToast('Não foi possível acessar a câmera: ' + erro, 'erro');
                         scannerAberto.value = false;
                     });
                 });
@@ -977,9 +1163,10 @@
             const buscarPorCodigo = (codigo) => {
                 const insumo = insumos.value.find(i => i.codigoBarra && i.codigoBarra === codigo);
                 if (!insumo) {
-                    alert('Nenhum insumo encontrado com este código.');
+                    mostrarToast('Nenhum insumo encontrado com este código.', 'erro');
                     return;
                 }
+                mostrarToast(`Insumo encontrado: ${insumo.nome}`, 'sucesso');
                 nextTick(() => {
                     const el = document.getElementById('auditoria-' + insumo.id);
                     if (el) {
@@ -1030,6 +1217,7 @@
             };
 
             return {
+                toasts, removerToast,
                 usuarioAtual, perfil, souAdmin, souSupervisor, souInspetor, modoRegistro, authForm, authErro, entrar, registrar, sair,
                 podeCadastrarProduto, podeEditarExcluir, podeVerLogs, podeCadastrarPessoa,
                 abaAtiva, menuAberto, irPara, insumos, insumosFiltrados, carregando, erroConexao,
@@ -1037,6 +1225,7 @@
                 form, salvarInsumo, salvarAuditoria, obterCorStatus,
                 insumoEditando, formEdicao, abrirEdicao, salvarEdicao, excluirInsumo,
                 logs, usuarios, convites, formConvite, dominioEmail, atualizarEmailGerado, pessoasCombinadas, enviarConvite, alterarNivelPessoa, excluirConvite,
+                alertas, alertasNaoLidos, alertasOrdenados, tiposAlerta: TIPOS_ALERTA, marcarAlertaComoLido, marcarTodosComoLidos,
                 scannerAberto, abrirScanner, fecharScanner,
                 exportarExcel, exportarPDF
             };
