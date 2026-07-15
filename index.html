@@ -14,6 +14,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -59,10 +60,16 @@
 
         body {
             background-color: #F8FAFC;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
+        .dark body { background-color: #0B1220; }
 
         ::-webkit-scrollbar { width: 6px; background: transparent; }
         ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+        /* Transição suave ao alternar tema */
+        .theme-smooth, .theme-smooth * { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.15s ease; }
 
         /* Estilos base para inputs industriais (grandes e com alto contraste) */
         .input-industrial {
@@ -78,6 +85,16 @@
             outline: none;
             border-color: #F97316;
             box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+        }
+        .dark .input-industrial {
+            background-color: #1E293B;
+            border-color: #3E4C63;
+            color: #E2E8F0;
+        }
+        .dark .input-industrial::placeholder { color: #64748B; }
+        .dark .input-industrial:focus {
+            border-color: #F97316;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
         }
 
         .btn-primario {
@@ -97,18 +114,32 @@
             transition: all 0.2s;
         }
         .btn-secundario:hover { background-color: #E2E8F0; color: #1E293B; }
+        .dark .btn-secundario {
+            background-color: #293548;
+            color: #CBD5E1;
+            border-color: #3E4C63;
+        }
+        .dark .btn-secundario:hover { background-color: #334155; color: #F8FAFC; }
 
         .destaque-scan { animation: piscar 1.2s ease-in-out 2; }
         @keyframes piscar { 0%,100% { background-color: #FFFFFF; } 50% { background-color: #FFF7ED; border-color: #F97316; } }
+        .dark .destaque-scan { animation: piscarEscuro 1.2s ease-in-out 2; }
+        @keyframes piscarEscuro { 0%,100% { background-color: #1E293B; } 50% { background-color: #431407; border-color: #F97316; } }
 
         .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
         .toast-enter-from { opacity: 0; transform: translateY(-12px); }
         .toast-leave-to { opacity: 0; transform: translateX(20px); }
     </style>
 </head>
-<body class="h-screen overflow-hidden bg-fundo text-slate-800">
+<body class="h-screen overflow-hidden bg-fundo dark:bg-[#0B1220] text-slate-800 dark:text-slate-200 theme-smooth">
 
 <div id="app" class="w-full h-full flex flex-col md:flex-row relative">
+
+    <!-- Indicador de modo offline -->
+    <div v-if="!online" class="absolute top-0 inset-x-0 z-[60] bg-amber-500 text-amber-950 text-center text-xs font-bold py-1.5 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-plug-circle-xmark"></i>
+        Sem conexão — exibindo dados salvos. Alterações serão sincronizadas quando a internet voltar.
+    </div>
 
     <div class="absolute top-4 inset-x-4 md:left-auto md:right-4 md:w-96 z-50 flex flex-col gap-2 pointer-events-none">
         <transition-group name="toast">
@@ -219,13 +250,13 @@
       </div>
 
       <!-- Formulário -->
-      <div class="w-full md:w-1/2 lg:w-[54%] flex items-center justify-center p-6 md:p-12 bg-white">
+      <div class="w-full md:w-1/2 lg:w-[54%] flex items-center justify-center p-6 md:p-12 bg-white dark:bg-slate-800">
         <div class="w-full max-w-sm">
             <div class="flex flex-col items-center md:items-start mb-8">
                 <div class="w-16 h-16 rounded-2xl bg-industrial-dark flex items-center justify-center mb-4 shadow-md md:hidden">
                     <i class="fa-solid fa-arrow-trend-up text-3xl text-industrial-orange"></i>
                 </div>
-                <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">StockFlow</h1>
+                <h1 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">StockFlow</h1>
                 <p class="text-sm text-slate-500 font-medium mt-1">{{ modoRegistro ? 'Criar nova conta' : 'Acesso ao Sistema' }}</p>
             </div>
 
@@ -243,14 +274,14 @@
                     <input v-model="authForm.senha" type="password" required minlength="6" class="input-industrial">
                 </div>
 
-                <p v-if="authErro" class="text-red-500 text-xs font-bold bg-red-50 p-2 rounded">{{ authErro }}</p>
+                <p v-if="authErro" class="text-red-500 text-xs font-bold bg-red-50 dark:bg-red-900/25 p-2 rounded">{{ authErro }}</p>
 
                 <button type="submit" class="w-full btn-primario py-2 rounded-xl text-sm mt-2 shadow-md">
                     {{ modoRegistro ? 'Cadastrar' : 'Entrar' }}
                 </button>
             </form>
 
-            <div class="text-center md:text-left mt-6 pt-6 border-t border-slate-100">
+            <div class="text-center md:text-left mt-6 pt-6 border-t border-slate-100 dark:border-slate-700/60">
                 <button @click="modoRegistro = !modoRegistro; authErro = null" class="text-sm text-industrial-blue font-bold hover:underline">
                     {{ modoRegistro ? 'Já possuo acesso' : 'Solicitar novo acesso' }}
                 </button>
@@ -293,6 +324,12 @@
             </nav>
             <div class="border-t border-slate-800 pt-5 mt-4">
                 <span class="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2 py-1 rounded font-bold uppercase inline-block mb-3">{{ perfil || '...' }}</span>
+                <button @click="alternarTema" class="w-full flex items-center justify-between gap-2 text-xs font-semibold text-slate-400 hover:text-white px-1 py-1.5 mb-1 transition-colors">
+                    <span><i class="fa-solid mr-1.5" :class="temaEscuro ? 'fa-sun' : 'fa-moon'"></i> {{ temaEscuro ? 'Modo claro' : 'Modo escuro' }}</span>
+                    <span class="relative inline-flex w-8 h-4 rounded-full transition-colors" :class="temaEscuro ? 'bg-industrial-orange' : 'bg-slate-700'">
+                        <span class="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" :class="temaEscuro ? 'left-[18px]' : 'left-0.5'"></span>
+                    </span>
+                </button>
                 <button @click="mostrarModalVersoes = true" class="w-full flex items-center justify-between gap-2 text-xs font-semibold text-slate-400 hover:text-white px-1 py-1.5 mb-1 transition-colors">
                     <span><i class="fa-solid fa-circle-info mr-1.5"></i> Sobre</span>
                     <span class="font-num text-[10px] bg-slate-800 px-1.5 py-0.5 rounded">{{ versaoAtual }}</span>
@@ -321,28 +358,31 @@
                 </button>
             </div>
 
-            <div v-if="menuAberto" class="absolute right-2 top-16 bg-white border border-slate-200 text-slate-800 rounded-xl shadow-2xl w-56 z-30 overflow-hidden">
-                <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50">
+            <div v-if="menuAberto" class="absolute right-2 top-16 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl shadow-2xl w-56 z-30 overflow-hidden">
+                <div class="px-4 py-1.5 border-b border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/70">
                     <span class="text-[10px] font-bold text-slate-500 uppercase">Usuário Atual</span>
                     <p class="text-sm font-bold text-industrial-dark capitalize">{{ perfil }}</p>
                 </div>
-                <button @click="irPara('alertas')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex items-center gap-3">
+                <button @click="irPara('alertas')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-3">
                     <i class="fa-solid fa-bell text-industrial-orange w-4"></i> Alertas
                 </button>
-                <button v-if="souAdmin" @click="irPara('relatorios')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex items-center gap-3">
+                <button v-if="souAdmin" @click="irPara('relatorios')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-3">
                     <i class="fa-solid fa-file-export text-industrial-blue w-4"></i> Relatórios
                 </button>
-                <button v-if="podeVerLogs" @click="irPara('logs')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex items-center gap-3">
+                <button v-if="podeVerLogs" @click="irPara('logs')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-3">
                     <i class="fa-solid fa-clock-rotate-left text-slate-500 w-4"></i> Histórico
                 </button>
-                <button v-if="podeCadastrarPessoa" @click="irPara('pessoas')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex items-center gap-3">
+                <button v-if="podeCadastrarPessoa" @click="irPara('pessoas')" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-3">
                     <i class="fa-solid fa-users-gear text-slate-500 w-4"></i> Acessos
                 </button>
-                <button @click="mostrarModalVersoes = true; menuAberto = false" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex items-center gap-3">
+                <button @click="alternarTema" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-3">
+                    <i class="fa-solid text-slate-500 w-4" :class="temaEscuro ? 'fa-sun' : 'fa-moon'"></i> {{ temaEscuro ? 'Modo claro' : 'Modo escuro' }}
+                </button>
+                <button @click="mostrarModalVersoes = true; menuAberto = false" class="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-3">
                     <i class="fa-solid fa-circle-info text-slate-500 w-4"></i> Sobre
                     <span class="font-num text-[10px] text-slate-400 ml-auto">{{ versaoAtual }}</span>
                 </button>
-                <button @click="sair" class="w-full text-left px-4 py-2 text-sm font-bold bg-red-50 hover:bg-red-100 text-red-600 flex items-center gap-3 border-t border-slate-100">
+                <button @click="sair" class="w-full text-left px-4 py-2 text-sm font-bold bg-red-50 dark:bg-red-900/25 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 flex items-center gap-3 border-t border-slate-100 dark:border-slate-700/60">
                     <i class="fa-solid fa-power-off w-4"></i> Sair
                 </button>
             </div>
@@ -353,13 +393,13 @@
             <div v-if="abaAtiva === 'dashboard'" class="animate-fade-in max-w-7xl mx-auto">
                 <div class="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
                     <div>
-                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Visão Geral da Produção</h2>
+                        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Visão Geral da Produção</h2>
                         <p class="text-sm text-slate-500 font-medium mt-1">Acompanhamento de estoque e KPIs</p>
                     </div>
                     
-                    <div v-if="unidadesFabris.length > 1" class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+                    <div v-if="unidadesFabris.length > 1" class="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 shadow-sm">
                         <i class="fa-solid fa-building text-slate-400 text-sm"></i>
-                        <select v-model="unidadeFabrilSelecionada" class="text-sm font-bold text-slate-700 focus:outline-none bg-transparent">
+                        <select v-model="unidadeFabrilSelecionada" class="text-sm font-bold text-slate-700 dark:text-slate-200 focus:outline-none bg-transparent">
                             <option :value="null">Todas as unidades</option>
                             <option v-for="u in unidadesFabris" :key="u" :value="u">{{ u }}</option>
                         </select>
@@ -367,35 +407,35 @@
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
                         <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Total Insumos</p>
-                        <p class="font-num text-3xl font-extrabold text-slate-900">{{ kpis.totalInsumos }}</p>
+                        <p class="font-num text-3xl font-extrabold text-slate-900 dark:text-white">{{ kpis.totalInsumos }}</p>
                     </div>
-                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
                         <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Custo Acumulado</p>
-                        <p class="font-num text-2xl font-extrabold text-slate-900">R$ {{ kpis.custoTotalAcumulado.toFixed(0) }}</p>
+                        <p class="font-num text-2xl font-extrabold text-slate-900 dark:text-white">R$ {{ kpis.custoTotalAcumulado.toFixed(0) }}</p>
                     </div>
-                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm col-span-2 md:col-span-1">
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm col-span-2 md:col-span-1">
                         <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Mais Consumido (ano)</p>
                         <p class="text-base font-bold text-industrial-blue truncate mt-1">{{ kpis.maisConsumido ? kpis.maisConsumido.nome : '-' }}</p>
                     </div>
-                    <div class="bg-red-50 border border-red-100 rounded-xl p-4 shadow-sm">
-                        <p class="text-xs text-red-600 font-bold uppercase tracking-wider mb-1">Estoque Crítico</p>
-                        <p class="font-num text-3xl font-extrabold text-red-600">{{ alertasCriticos.length }}</p>
+                    <div class="bg-red-50 dark:bg-red-900/25 border border-red-100 rounded-xl p-4 shadow-sm">
+                        <p class="text-xs text-red-600 dark:text-red-400 font-bold uppercase tracking-wider mb-1">Estoque Crítico</p>
+                        <p class="font-num text-3xl font-extrabold text-red-600 dark:text-red-400">{{ alertasCriticos.length }}</p>
                     </div>
                 </div>
 
-                <div v-if="Object.keys(custoPorCategoria).length > 0" class="bg-white border border-slate-200 rounded-xl p-4 mb-6 shadow-sm">
+                <div v-if="Object.keys(custoPorCategoria).length > 0" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 mb-6 shadow-sm">
                     <p class="text-xs font-bold text-slate-500 uppercase mb-2">Custo Acumulado por Categoria</p>
                     <grafico-categorias :dados="custoPorCategoria"></grafico-categorias>
                 </div>
 
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 mb-6">
+                <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-3 mb-6">
                     <div class="relative flex-1">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        <input v-model="buscaTexto" type="text" placeholder="Buscar insumo por nome..." class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-1.5 text-sm focus:outline-none focus:border-industrial-orange focus:ring-1 focus:ring-industrial-orange transition-colors">
+                        <input v-model="buscaTexto" type="text" placeholder="Buscar insumo por nome..." class="w-full bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg pl-10 pr-4 py-1.5 text-sm focus:outline-none focus:border-industrial-orange focus:ring-1 focus:ring-industrial-orange transition-colors">
                     </div>
-                    <select v-model="ordenacao" class="bg-slate-50 border border-slate-200 rounded-lg px-4 py-1.5 text-sm font-medium focus:outline-none focus:border-industrial-orange">
+                    <select v-model="ordenacao" class="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-1.5 text-sm font-medium focus:outline-none focus:border-industrial-orange">
                         <option value="nome-asc">Nome (A-Z)</option>
                         <option value="estoque-asc">Estoque (menor primeiro)</option>
                         <option value="estoque-desc">Estoque (maior primeiro)</option>
@@ -404,9 +444,9 @@
                 </div>
 
                 <div v-if="categorias.length > 0" class="flex gap-2 overflow-x-auto mb-6 pb-2">
-                    <button @click="filtroCategoria = null" :class="!filtroCategoria ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'" class="text-xs px-4 py-2 rounded-full whitespace-nowrap font-bold transition-all">Todas</button>
+                    <button @click="filtroCategoria = null" :class="!filtroCategoria ? 'bg-slate-800 text-white shadow-md' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60'" class="text-xs px-4 py-2 rounded-full whitespace-nowrap font-bold transition-all">Todas</button>
                     <button v-for="cat in categorias" :key="cat" @click="filtroCategoria = cat"
-                            :class="filtroCategoria === cat ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'"
+                            :class="filtroCategoria === cat ? 'bg-slate-800 text-white shadow-md' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60'"
                             class="text-xs px-4 py-2 rounded-full whitespace-nowrap font-bold transition-all">{{ cat }}</button>
                 </div>
 
@@ -417,58 +457,58 @@
 
                 <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     <div v-for="insumo in insumosFiltrados" :key="insumo.id" 
-                         class="bg-white rounded-xl border p-5 flex flex-col shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
-                         :class="insumo.diasRestantes <= (insumo.estoqueMinimoDias || 5) ? 'border-red-300' : 'border-slate-200'">
+                         class="bg-white dark:bg-slate-800 rounded-xl border p-5 flex flex-col shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+                         :class="insumo.diasRestantes <= (insumo.estoqueMinimoDias || 5) ? 'border-red-300' : 'border-slate-200 dark:border-slate-700'">
                         
                         <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="obterCorStatus(insumo)"></div>
 
                         <div class="flex justify-between items-start mb-3 pl-2">
                             <div class="pr-2">
                                 <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{{ insumo.categoria || 'Geral' }}</span>
-                                <h3 class="font-extrabold text-slate-900 text-lg leading-tight">{{ insumo.nome }}</h3>
+                                <h3 class="font-extrabold text-slate-900 dark:text-white text-lg leading-tight">{{ insumo.nome }}</h3>
                             </div>
                             
                             <span v-if="insumo.diasRestantes !== null && insumo.diasRestantes <= (insumo.estoqueMinimoDias || 5)" 
-                                  class="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-wider border border-red-200 animate-pulse whitespace-nowrap">
+                                  class="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-700 dark:text-red-300 text-[10px] font-black uppercase tracking-wider border border-red-200 dark:border-red-800/60 animate-pulse whitespace-nowrap">
                                 Crítico
                             </span>
                             <span v-else 
-                                  class="inline-flex items-center px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider border border-emerald-200 whitespace-nowrap">
+                                  class="inline-flex items-center px-2 py-1 rounded bg-emerald-50 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-200 whitespace-nowrap">
                                 Normal
                             </span>
                         </div>
 
-                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-100 mb-4 ml-2">
+                        <div class="bg-slate-50 dark:bg-slate-800/70 rounded-lg p-4 border border-slate-100 dark:border-slate-700/60 mb-4 ml-2">
                             <div class="flex justify-between items-baseline mb-2">
                                 <p class="text-xs font-bold text-slate-500 uppercase">Estoque Atual</p>
                                 <div class="text-right">
-                                    <span class="font-num font-black text-3xl text-slate-900">{{ insumo.estoqueAtual }}</span>
+                                    <span class="font-num font-black text-3xl text-slate-900 dark:text-white">{{ insumo.estoqueAtual }}</span>
                                     <span class="text-sm font-bold text-slate-500 ml-1">{{ insumo.unidade }}</span>
                                 </div>
                             </div>
                             <div class="flex justify-between items-center text-sm pt-2 border-t border-slate-200/60">
                                 <span class="text-slate-500">Previsão Fim:</span>
-                                <span class="font-bold text-slate-800">
+                                <span class="font-bold text-slate-800 dark:text-slate-100">
                                     {{ insumo.diasRestantes !== null ? insumo.diasRestantes.toFixed(1) + ' dias' : 'Calculando...' }}
                                 </span>
                             </div>
                         </div>
 
                         <div class="mt-auto ml-2">
-                            <button @click="insumo.mostrarGrafico = !insumo.mostrarGrafico" class="w-full text-center text-sm font-bold text-slate-600 bg-white border border-slate-300 py-1.5 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                            <button @click="insumo.mostrarGrafico = !insumo.mostrarGrafico" class="w-full text-center text-sm font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors flex items-center justify-center gap-2">
                                 <i class="fa-solid" :class="insumo.mostrarGrafico ? 'fa-chevron-up' : 'fa-chart-column'"></i>
                                 {{ insumo.mostrarGrafico ? 'Ocultar Histórico' : 'Ver Histórico' }}
                             </button>
 
-                            <div v-if="insumo.mostrarGrafico" class="mt-4 pt-4 border-t border-slate-200">
+                            <div v-if="insumo.mostrarGrafico" class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                 <chart-consumo :historico="insumo.historico" :unidade="insumo.unidade"></chart-consumo>
                             </div>
 
-                            <div v-if="podeEditarExcluir" class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                                <button @click="abrirEdicao(insumo)" class="flex-1 text-xs font-bold text-slate-700 bg-slate-100 py-1.5 rounded hover:bg-slate-200 transition-colors">
+                            <div v-if="podeEditarExcluir" class="flex gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                                <button @click="abrirEdicao(insumo)" class="flex-1 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 py-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                                     <i class="fa-solid fa-pen mr-1"></i> Editar
                                 </button>
-                                <button @click="excluirInsumo(insumo)" class="flex-1 text-xs font-bold text-red-700 bg-red-50 border border-red-100 py-1.5 rounded hover:bg-red-100 transition-colors">
+                                <button @click="excluirInsumo(insumo)" class="flex-1 text-xs font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/25 border border-red-100 py-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
                                     <i class="fa-solid fa-trash mr-1"></i> Excluir
                                 </button>
                             </div>
@@ -478,9 +518,9 @@
             </div>
 
             <div v-if="abaAtiva === 'cadastro' && podeCadastrarProduto" class="animate-fade-in max-w-2xl mx-auto">
-                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 md:p-8">
-                    <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-2">Novo Insumo</h2>
-                    <p class="text-sm text-slate-500 font-medium mb-6 pb-6 border-b border-slate-100">Cadastre um novo material na base de dados.</p>
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-6 md:p-8">
+                    <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">Novo Insumo</h2>
+                    <p class="text-sm text-slate-500 font-medium mb-6 pb-6 border-b border-slate-100 dark:border-slate-700/60">Cadastre um novo material na base de dados.</p>
                     
                     <form @submit.prevent="salvarInsumo" class="space-y-5">
                         <div>
@@ -514,7 +554,7 @@
                             </div>
                         </div>
                         
-                        <div class="pt-4 border-t border-slate-100 mt-2">
+                        <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 mt-2">
                             <button type="submit" class="w-full btn-primario py-2 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md">
                                 <i class="fa-solid fa-check"></i> Finalizar Cadastro
                             </button>
@@ -526,25 +566,25 @@
             <div v-if="abaAtiva === 'auditoria'" class="animate-fade-in max-w-4xl mx-auto">
                 <div class="flex justify-between items-end mb-6">
                     <div>
-                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Auditoria Física</h2>
+                        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Auditoria Física</h2>
                         <p class="text-sm text-slate-500 font-medium mt-1">Ajuste de contagem real (Chão de fábrica)</p>
                     </div>
                     <button @click="abrirScanner" class="btn-secundario px-4 py-1.5 rounded-lg flex items-center gap-2 shadow-sm border border-slate-300">
-                        <i class="fa-solid fa-barcode text-slate-700"></i> <span class="hidden sm:inline">Ler Código</span>
+                        <i class="fa-solid fa-barcode text-slate-700 dark:text-slate-200"></i> <span class="hidden sm:inline">Ler Código</span>
                     </button>
                 </div>
 
                 <div v-for="insumo in insumosDaUnidade" :key="'auditoria-'+insumo.id" :id="'auditoria-'+insumo.id"
-                     class="bg-white border border-slate-200 rounded-xl p-4 mb-3 flex items-center justify-between shadow-sm">
+                     class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 mb-3 flex items-center justify-between shadow-sm">
                     <div class="flex-1 pr-4">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ insumo.categoria }}</span>
-                        <h3 class="font-bold text-slate-900 text-lg leading-tight mt-0.5">{{ insumo.nome }}</h3>
-                        <p class="text-xs text-slate-500 mt-1 font-medium">Sistema: <span class="font-num text-slate-700">{{ insumo.estoqueAtual }}</span> {{ insumo.unidade }}</p>
+                        <h3 class="font-bold text-slate-900 dark:text-white text-lg leading-tight mt-0.5">{{ insumo.nome }}</h3>
+                        <p class="text-xs text-slate-500 mt-1 font-medium">Sistema: <span class="font-num text-slate-700 dark:text-slate-200">{{ insumo.estoqueAtual }}</span> {{ insumo.unidade }}</p>
                     </div>
                     <div class="w-32 flex flex-col items-end">
                         <label class="text-[10px] font-bold text-slate-400 uppercase mb-1">Físico Atual</label>
                         <input type="number" step="0.01" v-model.number="insumo.novoEstoque" 
-                               class="w-24 bg-slate-50 border-2 border-slate-300 text-center font-num font-black text-2xl text-industrial-orange rounded-lg py-2 focus:outline-none focus:border-industrial-orange focus:bg-white transition-colors">
+                               class="w-24 bg-slate-50 dark:bg-slate-800/70 border-2 border-slate-300 text-center font-num font-black text-2xl text-industrial-orange rounded-lg py-2 focus:outline-none focus:border-industrial-orange focus:bg-white transition-colors">
                     </div>
                 </div>
 
@@ -555,9 +595,9 @@
                 </div>
 
                 <div v-if="scannerAberto" class="fixed inset-0 bg-slate-900/90 z-50 flex flex-col justify-center items-center p-4 backdrop-blur-sm">
-                    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-                        <h3 class="text-lg font-bold text-slate-900 text-center mb-4">Câmera de Leitura</h3>
-                        <div id="leitor-codigo" class="w-full rounded-xl overflow-hidden border-2 border-slate-200"></div>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white text-center mb-4">Câmera de Leitura</h3>
+                        <div id="leitor-codigo" class="w-full rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-700"></div>
                         <button @click="fecharScanner" class="w-full mt-6 btn-secundario py-1.5 rounded-xl font-bold">Cancelar</button>
                     </div>
                 </div>
@@ -566,7 +606,7 @@
             <!-- ---------- CENTRAL DE ALERTAS ---------- -->
             <div v-if="abaAtiva === 'alertas'" class="animate-fade-in max-w-4xl mx-auto">
                 <div class="flex justify-between items-center mb-1">
-                    <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Central de Alertas</h2>
+                    <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Central de Alertas</h2>
                     <button v-if="alertasNaoLidos.length > 0" @click="marcarTodosComoLidos" class="text-xs text-industrial-blue font-bold underline">Marcar tudo como lido</button>
                 </div>
                 <p class="text-sm text-slate-500 font-medium mb-6">Estoque zerado, estoque crítico e insumos sem auditoria recente.</p>
@@ -577,19 +617,19 @@
                 </div>
 
                 <div v-for="alerta in alertasOrdenados" :key="alerta.id"
-                     class="bg-white border rounded-xl p-4 mb-3 flex items-start gap-3 shadow-sm"
-                     :class="alerta.lido ? 'border-slate-200 opacity-60' : 'border-red-200'">
+                     class="bg-white dark:bg-slate-800 border rounded-xl p-4 mb-3 flex items-start gap-3 shadow-sm"
+                     :class="alerta.lido ? 'border-slate-200 dark:border-slate-700 opacity-60' : 'border-red-200 dark:border-red-800/60'">
                     <i class="fa-solid text-lg mt-0.5"
                        :class="[tiposAlerta[alerta.tipo] ? tiposAlerta[alerta.tipo].icone : 'fa-bell', alerta.resolvido ? 'text-slate-400' : 'text-red-500']"></i>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-slate-800 truncate">{{ alerta.insumoNome }}</p>
-                        <p class="text-xs text-slate-600">{{ alerta.mensagem }}</p>
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{{ alerta.insumoNome }}</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-300">{{ alerta.mensagem }}</p>
                         <p class="text-[10px] text-slate-400 mt-1">
                             {{ new Date(alerta.criadoEm).toLocaleString('pt-BR') }}
                             <span v-if="alerta.resolvido" class="text-emerald-600 font-bold"> · Resolvido</span>
                         </p>
                     </div>
-                    <button v-if="!alerta.lido" @click="marcarAlertaComoLido(alerta)" class="text-[10px] text-industrial-blue font-bold border border-blue-200 rounded px-2 py-1 whitespace-nowrap">
+                    <button v-if="!alerta.lido" @click="marcarAlertaComoLido(alerta)" class="text-[10px] text-industrial-blue font-bold border border-blue-200 dark:border-blue-800/60 rounded px-2 py-1 whitespace-nowrap">
                         Marcar lido
                     </button>
                 </div>
@@ -597,7 +637,7 @@
 
             <!-- ---------- RELATÓRIOS (admin) ---------- -->
             <div v-if="abaAtiva === 'relatorios' && souAdmin" class="animate-fade-in max-w-2xl mx-auto">
-                <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Relatórios</h2>
+                <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">Relatórios</h2>
                 <p class="text-sm text-slate-500 font-medium mb-6">Exporta todos os insumos com estoque, dias restantes e custos.</p>
                 <button @click="exportarExcel" class="w-full btn-primario py-2 rounded-xl mb-3 shadow-md">
                     <i class="fa-solid fa-file-excel mr-2"></i> Exportar Excel
@@ -606,7 +646,7 @@
                     <i class="fa-solid fa-file-pdf mr-2"></i> Exportar PDF
                 </button>
 
-                <div class="mt-8 pt-6 border-t border-slate-200">
+                <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
                     <h3 class="text-xs font-bold text-slate-500 uppercase mb-2">Manutenção</h3>
                     <button @click="normalizarCategoriasExistentes" class="w-full btn-secundario py-1.5 rounded-xl">
                         <i class="fa-solid fa-broom mr-2"></i> Padronizar categorias existentes
@@ -616,18 +656,18 @@
 
             <!-- ---------- LOGS (admin + supervisor) ---------- -->
             <div v-if="abaAtiva === 'logs' && podeVerLogs" class="animate-fade-in max-w-2xl mx-auto">
-                <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Histórico de Alterações</h2>
+                <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">Histórico de Alterações</h2>
                 <p class="text-sm text-slate-500 font-medium mb-6">Registro de cadastros, edições e auditorias.</p>
                 <div v-if="logs.length === 0" class="text-center text-slate-400 mt-10">
                     <i class="fa-solid fa-inbox text-4xl mb-3"></i>
                     <p>Nenhum registro ainda.</p>
                 </div>
-                <div v-for="log in logs" :key="log.id" class="bg-white border border-slate-200 rounded-xl p-3 mb-2 text-sm shadow-sm">
+                <div v-for="log in logs" :key="log.id" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-2 text-sm shadow-sm">
                     <div class="flex justify-between">
                         <span class="font-bold text-industrial-blue">{{ log.tipo }}</span>
                         <span class="text-[10px] text-slate-400">{{ new Date(log.timestamp).toLocaleString('pt-BR') }}</span>
                     </div>
-                    <p class="text-slate-700">{{ log.insumoNome }} — {{ log.detalhes }}</p>
+                    <p class="text-slate-700 dark:text-slate-200">{{ log.insumoNome }} — {{ log.detalhes }}</p>
                     <p class="text-[10px] text-slate-400">{{ log.usuarioEmail }}</p>
                 </div>
             </div>
@@ -636,7 +676,7 @@
             <div v-if="abaAtiva === 'pessoas' && podeCadastrarPessoa" class="animate-fade-in max-w-2xl mx-auto">
                 <div class="flex justify-between items-start mb-1 gap-3">
                     <div>
-                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">{{ souAdmin ? 'Níveis de Acesso' : 'Cadastro de Pessoas' }}</h2>
+                        <h2 class="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">{{ souAdmin ? 'Níveis de Acesso' : 'Cadastro de Pessoas' }}</h2>
                         <p class="text-sm text-slate-500 font-medium">{{ souAdmin ? 'Cadastre pessoas e vincule o nível de acesso de cada uma.' : 'Cadastre uma nova pessoa. Ela entra como Inspetor.' }}</p>
                     </div>
                     <button @click="mostrarModalPessoa = true" class="btn-primario px-4 py-1.5 rounded-xl text-sm whitespace-nowrap shrink-0">
@@ -647,14 +687,14 @@
                 <div v-if="souAdmin" class="mt-5">
                     <h3 class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Pessoas cadastradas</h3>
                     <div v-if="pessoasCombinadas.length === 0" class="text-center text-slate-400 mt-6 text-sm">Nenhuma pessoa cadastrada ainda.</div>
-                    <div v-for="p in pessoasCombinadas" :key="p.status + '-' + p.id" class="bg-white border border-slate-200 rounded-xl p-3 mb-2 shadow-sm">
+                    <div v-for="p in pessoasCombinadas" :key="p.status + '-' + p.id" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-2 shadow-sm">
                         <div class="flex justify-between items-center">
                             <div class="mr-2 min-w-0">
-                                <p class="text-sm font-bold text-slate-800 truncate">{{ p.nome || p.email }}</p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{{ p.nome || p.email }}</p>
                                 <p class="text-[10px] text-slate-400 truncate">{{ p.email }}</p>
                             </div>
                             <span class="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
-                                  :class="p.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'">
+                                  :class="p.status === 'ativo' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'">
                                 {{ p.status === 'ativo' ? 'Ativo' : 'Convidado' }}
                             </span>
                         </div>
@@ -664,7 +704,7 @@
                                 <option value="supervisor">Supervisor</option>
                                 <option value="inspetor">Inspetor</option>
                             </select>
-                            <button v-if="p.status === 'convidado'" @click="excluirConvite(p)" class="text-red-500 text-xs px-2 py-1.5 border border-red-200 rounded-lg">
+                            <button v-if="p.status === 'convidado'" @click="excluirConvite(p)" class="text-red-500 text-xs px-2 py-1.5 border border-red-200 dark:border-red-800/60 rounded-lg">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
                         </div>
@@ -680,10 +720,10 @@
 
         <!-- ---------- MODAL: NOVO INSUMO ---------- -->
         <div v-if="mostrarModalCadastro" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
-            <div class="bg-white w-full max-w-lg mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="bg-white dark:bg-slate-800 w-full max-w-lg mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-extrabold text-slate-900">Novo Insumo</h3>
-                    <button @click="mostrarModalCadastro = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                    <h3 class="text-lg font-extrabold text-slate-900 dark:text-white">Novo Insumo</h3>
+                    <button @click="mostrarModalCadastro = false" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -751,8 +791,8 @@
                     </div>
                 </form>
 
-                <div class="mt-6 pt-5 border-t border-slate-200">
-                    <h3 class="text-sm font-bold text-slate-700 mb-1"><i class="fa-solid fa-file-arrow-up mr-1 text-industrial-blue"></i> Importar em massa</h3>
+                <div class="mt-6 pt-5 border-t border-slate-200 dark:border-slate-700">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-200 mb-1"><i class="fa-solid fa-file-arrow-up mr-1 text-industrial-blue"></i> Importar em massa</h3>
                     <p class="text-xs text-slate-500 mb-3">Cadastre vários insumos de uma vez a partir de uma planilha Excel ou CSV.</p>
                     <button @click="baixarModeloImportacao" type="button" class="w-full btn-secundario py-1.5 rounded-xl mb-2 text-sm">
                         <i class="fa-solid fa-download mr-2"></i> Baixar planilha modelo
@@ -768,10 +808,10 @@
 
         <!-- ---------- MODAL: NOVA PESSOA ---------- -->
         <div v-if="mostrarModalPessoa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
-            <div class="bg-white w-full max-w-md mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
+            <div class="bg-white dark:bg-slate-800 w-full max-w-md mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-extrabold text-slate-900">Nova Pessoa</h3>
-                    <button @click="mostrarModalPessoa = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                    <h3 class="text-lg font-extrabold text-slate-900 dark:text-white">Nova Pessoa</h3>
+                    <button @click="mostrarModalPessoa = false" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -781,7 +821,7 @@
                         <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">E-mail de acesso (gerado automaticamente)</label>
                         <div class="flex gap-2">
                             <input v-model="formConvite.email" :readonly="!formConvite.emailEditadoManualmente" type="email" required
-                                   :class="formConvite.emailEditadoManualmente ? 'bg-white' : 'bg-slate-50 text-slate-500'"
+                                   :class="formConvite.emailEditadoManualmente ? 'bg-white dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-800/70 text-slate-500'"
                                    class="flex-1 input-industrial">
                             <button type="button" @click="formConvite.emailEditadoManualmente = !formConvite.emailEditadoManualmente"
                                     class="px-3 btn-secundario rounded-lg">
@@ -808,18 +848,18 @@
 
         <!-- ---------- MODAL: SOBRE / HISTÓRICO DE VERSÕES ---------- -->
         <div v-if="mostrarModalVersoes" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
-            <div class="bg-white w-full max-w-lg mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
+            <div class="bg-white dark:bg-slate-800 w-full max-w-lg mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
                 <div class="flex justify-between items-center mb-1">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-industrial-dark flex items-center justify-center">
                             <i class="fa-solid fa-arrow-trend-up text-industrial-orange"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-extrabold text-slate-900 leading-tight">StockFlow</h3>
+                            <h3 class="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">StockFlow</h3>
                             <p class="font-num text-xs text-slate-400">Versão atual: {{ versaoAtual }}</p>
                         </div>
                     </div>
-                    <button @click="mostrarModalVersoes = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                    <button @click="mostrarModalVersoes = false" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -830,10 +870,10 @@
                         <div class="absolute left-0 top-1 w-3 h-3 rounded-full" :class="idx === 0 ? 'bg-industrial-orange' : 'bg-slate-300'"></div>
                         <div v-if="idx < historicoVersoes.length - 1" class="absolute left-[5px] top-4 bottom-[-16px] w-px bg-slate-200"></div>
                         <div class="flex items-baseline gap-2 mb-1">
-                            <span class="font-num text-sm font-bold text-slate-900">{{ item.versao }}</span>
+                            <span class="font-num text-sm font-bold text-slate-900 dark:text-white">{{ item.versao }}</span>
                             <span class="text-[11px] text-slate-400">{{ new Date(item.data).toLocaleDateString('pt-BR') }}</span>
                         </div>
-                        <ul class="text-sm text-slate-600 space-y-1 list-disc list-inside">
+                        <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-1 list-disc list-inside">
                             <li v-for="(mudanca, i) in item.mudancas" :key="i">{{ mudanca }}</li>
                         </ul>
                     </div>
@@ -843,8 +883,8 @@
 
         <!-- ---------- MODAL DE EDIÇÃO ---------- -->
         <div v-if="insumoEditando" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-end md:items-center md:justify-center p-0 md:p-4">
-            <div class="bg-white w-full max-w-md mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
-                <h3 class="text-lg font-extrabold text-slate-900 mb-4">Editar Insumo</h3>
+            <div class="bg-white dark:bg-slate-800 w-full max-w-md mx-auto rounded-t-3xl md:rounded-2xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl">
+                <h3 class="text-lg font-extrabold text-slate-900 dark:text-white mb-4">Editar Insumo</h3>
                 <form @submit.prevent="salvarEdicao" class="space-y-3">
                     <input v-model="formEdicao.nome" type="text" required placeholder="Nome" class="input-industrial">
                     <input v-model="formEdicao.categoria" type="text" placeholder="Categoria" class="input-industrial">
@@ -876,7 +916,7 @@
             </div>
         </div>
 
-        <nav class="md:hidden absolute bottom-0 w-full bg-white border-t border-slate-200 flex justify-around items-center h-16 shadow-[0_-4px_15px_rgba(0,0,0,0.03)] z-40 pb-safe">
+        <nav class="md:hidden absolute bottom-0 w-full bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-around items-center h-16 shadow-[0_-4px_15px_rgba(0,0,0,0.03)] z-40 pb-safe">
             <button @click="irPara('dashboard')" :class="{'text-industrial-orange': abaAtiva === 'dashboard', 'text-slate-400': abaAtiva !== 'dashboard'}" class="flex flex-col items-center w-1/3 py-2 transition-colors">
                 <i class="fa-solid fa-chart-line text-xl mb-1"></i>
                 <span class="text-[10px] font-bold">Geral</span>
@@ -947,8 +987,8 @@
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
-                            x: { ticks: { font: { size: 10 } } }
+                            y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#94A3B8' }, grid: { color: 'rgba(148,163,184,0.15)' } },
+                            x: { ticks: { font: { size: 10 }, color: '#94A3B8' }, grid: { color: 'rgba(148,163,184,0.1)' } }
                         }
                     }
                 });
@@ -994,8 +1034,8 @@
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            x: { beginAtZero: true, ticks: { font: { size: 10 } } },
-                            y: { ticks: { font: { size: 10 } } }
+                            x: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#94A3B8' }, grid: { color: 'rgba(148,163,184,0.15)' } },
+                            y: { ticks: { font: { size: 10 }, color: '#94A3B8' }, grid: { color: 'rgba(148,163,184,0.1)' } }
                         }
                     }
                 });
@@ -1024,6 +1064,16 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+
+    // ---------- Modo offline ----------
+    // Guarda os dados do Firestore em cache local (IndexedDB). Sem internet,
+    // o app continua abrindo com os últimos dados e as escritas ficam na fila,
+    // sincronizando automaticamente quando a conexão voltar.
+    db.enablePersistence({ synchronizeTabs: true }).catch((erro) => {
+        // 'failed-precondition': múltiplas abas sem suporte a sincronização
+        // 'unimplemented': navegador não suporta IndexedDB
+        console.warn('Persistência offline indisponível:', erro.code);
+    });
     const auth = firebase.auth();
     const COL_INSUMOS = 'insumos';
     const COL_USUARIOS = 'usuarios';
@@ -1044,8 +1094,16 @@
     // Toda vez que uma alteração é feita na aplicação, adicione uma nova
     // entrada aqui no topo (mais recente primeiro) e atualize VERSAO_ATUAL.
     // ============================================================
-    const VERSAO_ATUAL = 'v2.5.0';
+    const VERSAO_ATUAL = 'v2.6.0';
     const HISTORICO_VERSOES = [
+        {
+            versao: 'v2.6.0', data: '2026-07-15',
+            mudancas: [
+                'Modo escuro completo, com alternância na barra lateral e no menu, e preferência salva no navegador.',
+                'Modo offline: dados em cache local, escritas na fila e sincronização automática ao reconectar.',
+                'Indicador visual de "sem conexão" no topo da tela.'
+            ]
+        },
         {
             versao: 'v2.5.0', data: '2026-07-15',
             mudancas: [
@@ -1137,6 +1195,27 @@
 
     const app = createApp({
         setup() {
+            // ---------- Tema claro/escuro ----------
+            // Preferência salva no navegador; se não houver, segue o tema do sistema.
+            const temaEscuro = ref(false);
+            try {
+                const salvo = localStorage.getItem('stockflow_tema');
+                if (salvo) temaEscuro.value = salvo === 'escuro';
+                else temaEscuro.value = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } catch (e) { /* localStorage indisponível: mantém claro */ }
+            document.documentElement.classList.toggle('dark', temaEscuro.value);
+
+            const alternarTema = () => {
+                temaEscuro.value = !temaEscuro.value;
+                document.documentElement.classList.toggle('dark', temaEscuro.value);
+                try { localStorage.setItem('stockflow_tema', temaEscuro.value ? 'escuro' : 'claro'); } catch (e) {}
+            };
+
+            // ---------- Status de conexão (modo offline) ----------
+            const online = ref(navigator.onLine);
+            window.addEventListener('online', () => { online.value = true; });
+            window.addEventListener('offline', () => { online.value = false; });
+
             // ---------- Toasts (substituem os alert() nativos do navegador) ----------
             const toasts = ref([]);
             const mostrarToast = (mensagem, tipo = 'sucesso', duracao = 3500) => {
@@ -1946,6 +2025,7 @@
 
             return {
                 toasts, removerToast,
+                temaEscuro, alternarTema, online,
                 usuarioAtual, perfil, souAdmin, souSupervisor, souInspetor, modoRegistro, authForm, authErro, entrar, registrar, sair,
                 podeCadastrarProduto, podeEditarExcluir, podeVerLogs, podeCadastrarPessoa,
                 abaAtiva, menuAberto, mostrarModalCadastro, mostrarModalPessoa, mostrarModalVersoes, irPara, insumos, insumosFiltrados, carregando, erroConexao,
